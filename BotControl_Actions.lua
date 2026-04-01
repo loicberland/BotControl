@@ -13,13 +13,9 @@ BotControlActions.definitions = {
         label = "Init",
         builder = "InitCommands"
     },
-    SummonDistance = {
-        label = "Summon distance",
-        builder = "SummonDistanceCommands"
-    },
-    SummonTank = {
-        label = "Summon tank",
-        builder = "SummonTankCommands"
+    Summon = {
+        label = "Summon",
+        builder = "SummonCommands"
     },
     TankAttack = {
         label = "Tank attack",
@@ -69,11 +65,11 @@ function BotControlActions:BuildCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
-    AddWhisper(commands, cfg.tankName, cfg.tankBuild)
-    AddWhisper(commands, cfg.healName, cfg.healBuild)
-    AddWhisper(commands, cfg.dps1Name, cfg.dps1Build)
-    AddWhisper(commands, cfg.dps2Name, cfg.dps2Build)
-    AddWhisper(commands, cfg.dps3Name, cfg.dps3Build)
+    AddWhisper(commands, cfg.tankName, "talents " .. cfg.tankBuild)
+    AddWhisper(commands, cfg.healName, "talents " .. cfg.healBuild)
+    AddWhisper(commands, cfg.dps1Name, "talents " .. cfg.dps1Build)
+    AddWhisper(commands, cfg.dps2Name, "talents " .. cfg.dps2Build)
+    AddWhisper(commands, cfg.dps3Name, "talents " .. cfg.dps3Build)
 
     return commands
 end
@@ -97,10 +93,11 @@ function BotControlActions:InitCommands()
     return commands
 end
 
-function BotControlActions:SummonDistanceCommands()
+function BotControlActions:SummonCommands()
     local cfg = self:GetConfig()
     local commands = {}
     local names = {
+        cfg.tankName,
         cfg.healName,
         cfg.dps1Name,
         cfg.dps2Name,
@@ -112,17 +109,7 @@ function BotControlActions:SummonDistanceCommands()
     for index = 1, table.getn(names) do
         name = names[index]
         AddWhisper(commands, name, "summon")
-        AddWhisper(commands, name, "stay")
     end
-
-    return commands
-end
-
-function BotControlActions:SummonTankCommands()
-    local cfg = self:GetConfig()
-    local commands = {}
-
-    AddWhisper(commands, cfg.tankName, "summon")
 
     return commands
 end
@@ -188,4 +175,38 @@ function BotControlActions:RunAction(actionKey)
     BotControl.Print("Running action: " .. definition.label)
     commands = self[definition.builder](self)
     BotControl.RunCommands(commands)
+end
+
+function BotControl_Action_Build()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Build")
+    end
+end
+
+function BotControl_Action_Init()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Init")
+    end
+end
+
+function BotControl_Action_Summon()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Summon")
+    end
+end
+
+function BotControl_Action_FullSetup()
+    print("BotControl: Running Full Setup")
+
+    if BotControl_Action_Build then
+        BotControl_Action_Build()
+    end
+
+    if BotControl_Action_Init then
+        BotControl_Action_Init()
+    end
+
+    if BotControl_Action_Summon then
+        BotControl_Action_Summon()
+    end
 end

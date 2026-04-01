@@ -10,7 +10,22 @@ BotControlConfig.defaults = {
     healBuild = "",
     dps1Build = "",
     dps2Build = "",
-    dps3Build = ""
+    dps3Build = "",
+    profiles = {},
+    bots = {
+        tank = "",
+        heal = "",
+        dps1 = "",
+        dps2 = "",
+        dps3 = ""
+    },
+    builds = {
+        tank = "",
+        heal = "",
+        dps1 = "",
+        dps2 = "",
+        dps3 = ""
+    }
 }
 
 local function CopyDefaults(target, defaults)

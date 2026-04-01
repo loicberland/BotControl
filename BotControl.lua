@@ -2,6 +2,39 @@ BotControl = {}
 BotControl_ProfileElements = {}
 BotControl_ActionElements = {}
 
+BotControl.ACTION_BUTTON_CONFIG = {
+    ComposeGroup = {
+        texture = "Interface\\Icons\\Spell_Nature_MassTeleport",
+        title = "Composer le groupe",
+        description = "Cree le groupe avec les bots configures"
+    },
+    Build = {
+        texture = "Interface\\Icons\\Ability_Marksmanship",
+        title = "Appliquer les spes",
+        description = "Applique les talents aux bots configures"
+    },
+    Init = {
+        texture = "Interface\\Icons\\INV_Misc_Gear_01",
+        title = "Initialiser",
+        description = "Applique la configuration de base des bots"
+    },
+    FullSetup = {
+        texture = "Interface\\Icons\\Spell_Holy_BlessingOfStamina",
+        title = "Preparation complete",
+        description = "Lance Build, Init et Summon"
+    },
+    Summon = {
+        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
+        title = "Invocation",
+        description = "Invoque tous les bots configures"
+    },
+    TankAttack = {
+        texture = "Interface\\Icons\\Ability_Warrior_Charge",
+        title = "Attaque du tank",
+        description = "Ordonne au tank d'attaquer, les autres attendent"
+    }
+}
+
 BotControl.FIELD_DEFINITIONS = {
     { key = "tankName", label = "Tank bot", column = "left", order = 1 },
     { key = "healName", label = "Heal bot", column = "left", order = 2 },
@@ -70,18 +103,18 @@ function BotControl.RegisterSpecialFrame(frameName)
 end
 
 function BotControl.CreateField(parent, definition)
-    local rowY = -64 - ((definition.order - 1) * 56)
+    local rowY = -78 - ((definition.order - 1) * 40)
     local labelX
     local boxX
     local label
     local editBox
 
     if definition.column == "left" then
-        labelX = 26
-        boxX = 26
+        labelX = 24
+        boxX = 24
     else
-        labelX = 276
-        boxX = 276
+        labelX = 222
+        boxX = 222
     end
 
     label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -90,9 +123,9 @@ function BotControl.CreateField(parent, definition)
     label:SetText(definition.label)
 
     editBox = CreateFrame("EditBox", nil, parent)
-    editBox:SetWidth(190)
+    editBox:SetWidth(150)
     editBox:SetHeight(20)
-    editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", boxX, rowY - 16)
+    editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", boxX, rowY - 14)
     editBox:SetAutoFocus(false)
     editBox:SetFontObject(GameFontHighlightSmall)
     editBox:SetJustifyH("LEFT")
@@ -142,6 +175,66 @@ function BotControl.AddElement(targetTable, element)
     end
 
     table.insert(targetTable, element)
+end
+
+function BotControl_SetActionButtonIcon(button, texturePath, title, description)
+    if not button then
+        return
+    end
+
+    button:SetWidth(36)
+    button:SetHeight(36)
+    button:SetText("")
+    button:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
+    button:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
+    button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+    button:GetHighlightTexture():SetBlendMode("ADD")
+
+    if not button.iconTexture then
+        button.iconTexture = button:CreateTexture(nil, "ARTWORK")
+        button.iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
+        button.iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
+        button.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    end
+
+    button.iconTexture:SetTexture(texturePath)
+    button.tooltipTitle = title or ""
+    button.tooltipDescription = description or ""
+
+    button:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(self.tooltipTitle or "")
+        if BotControl.HasValue(self.tooltipDescription) then
+            GameTooltip:AddLine(self.tooltipDescription, 1, 1, 1, 1)
+        end
+        GameTooltip:Show()
+    end)
+
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
+end
+
+function BotControl.StyleActionButtons()
+    local config
+
+    config = BotControl.ACTION_BUTTON_CONFIG.ComposeGroup
+    BotControl_SetActionButtonIcon(BotControlFrameComposeGroupButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Build
+    BotControl_SetActionButtonIcon(BotControlFrameBuildButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Init
+    BotControl_SetActionButtonIcon(BotControlFrameInitButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.FullSetup
+    BotControl_SetActionButtonIcon(BotControlFullSetupButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Summon
+    BotControl_SetActionButtonIcon(BotControlFrameSummonButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.TankAttack
+    BotControl_SetActionButtonIcon(BotControlFrameTankAttackButton, config.texture, config.title, config.description)
 end
 
 function BotControl.RegisterTabElements(frame)
@@ -224,6 +317,7 @@ function BotControl.InitializeFrame(frame)
 
     BotControl.BuildFields(frame)
     BotControl.CreateButtons(frame)
+    BotControl.StyleActionButtons()
     BotControl.RegisterTabElements(frame)
     BotControl.RegisterSpecialFrame("BotControlFrame")
     frame.isInitialized = true
@@ -519,6 +613,8 @@ function BotControl_LayoutButtons()
     local frame = BotControlFrame
     local profilesTabButton = BotControlTabProfiles
     local actionsTabButton = BotControlTabActions
+    local namesHeader = BotControlFrameNamesHeader
+    local buildsHeader = BotControlFrameBuildsHeader
     local profileNameLabel = BotControlFrameProfileNameLabel
     local profileNameEditBox = BotControlProfileNameEditBox
     local saveProfileButton = BotControlSaveProfileButton
@@ -550,98 +646,112 @@ function BotControl_LayoutButtons()
         end
     end
 
+    if namesHeader then
+        namesHeader:ClearAllPoints()
+        namesHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -58)
+    end
+
+    if buildsHeader then
+        buildsHeader:ClearAllPoints()
+        buildsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 222, -58)
+    end
+
     if profileNameLabel then
         profileNameLabel:ClearAllPoints()
-        profileNameLabel:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 20, 126)
+        profileNameLabel:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 60)
     end
 
     if profileNameEditBox then
         profileNameEditBox:ClearAllPoints()
-        profileNameEditBox:SetWidth(190)
+        profileNameEditBox:SetWidth(150)
         profileNameEditBox:SetHeight(20)
         profileNameEditBox:SetPoint("LEFT", profileNameLabel, "RIGHT", 12, 0)
     end
 
     if saveProfileButton then
         saveProfileButton:ClearAllPoints()
-        saveProfileButton:SetWidth(110)
+        saveProfileButton:SetWidth(96)
         saveProfileButton:SetHeight(24)
-        saveProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 20, 88)
+        saveProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 20)
     end
 
     if loadProfileButton then
         loadProfileButton:ClearAllPoints()
-        loadProfileButton:SetWidth(110)
+        loadProfileButton:SetWidth(96)
         loadProfileButton:SetHeight(24)
         if saveProfileButton then
-            loadProfileButton:SetPoint("LEFT", saveProfileButton, "RIGHT", 10, 0)
+            loadProfileButton:SetPoint("LEFT", saveProfileButton, "RIGHT", 8, 0)
         else
-            loadProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 140, 88)
+            loadProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 128, 20)
         end
     end
 
     if deleteProfileButton then
         deleteProfileButton:ClearAllPoints()
-        deleteProfileButton:SetWidth(110)
+        deleteProfileButton:SetWidth(96)
         deleteProfileButton:SetHeight(24)
         if loadProfileButton then
-            deleteProfileButton:SetPoint("LEFT", loadProfileButton, "RIGHT", 10, 0)
+            deleteProfileButton:SetPoint("LEFT", loadProfileButton, "RIGHT", 8, 0)
         else
-            deleteProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 260, 88)
+            deleteProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 232, 20)
         end
     end
 
     if composeGroupButton then
         composeGroupButton:ClearAllPoints()
-        composeGroupButton:SetWidth(140)
-        composeGroupButton:SetHeight(24)
-        composeGroupButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 20, 54)
+        composeGroupButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 234, 96)
     end
 
     if buildButton then
         buildButton:ClearAllPoints()
-        buildButton:SetWidth(100)
-        buildButton:SetHeight(24)
-        buildButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 170, 54)
+        if composeGroupButton then
+            buildButton:SetPoint("LEFT", composeGroupButton, "RIGHT", 12, 0)
+        else
+            buildButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 282, 96)
+        end
     end
 
     if initButton then
         initButton:ClearAllPoints()
-        initButton:SetWidth(100)
-        initButton:SetHeight(24)
-        initButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 280, 54)
+        if buildButton then
+            initButton:SetPoint("LEFT", buildButton, "RIGHT", 12, 0)
+        else
+            initButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 330, 96)
+        end
     end
 
     if fullSetupButton then
         fullSetupButton:ClearAllPoints()
-        fullSetupButton:SetWidth(140)
-        fullSetupButton:SetHeight(24)
-        if initButton then
-            fullSetupButton:SetPoint("LEFT", initButton, "RIGHT", 10, 0)
+        if composeGroupButton then
+            fullSetupButton:SetPoint("TOP", composeGroupButton, "BOTTOM", 0, -12)
         else
-            fullSetupButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 390, 54)
+            fullSetupButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 234, 48)
         end
     end
 
     if summonButton then
         summonButton:ClearAllPoints()
-        summonButton:SetWidth(120)
-        summonButton:SetHeight(24)
-        summonButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 20, 20)
+        if fullSetupButton then
+            summonButton:SetPoint("LEFT", fullSetupButton, "RIGHT", 12, 0)
+        else
+            summonButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 282, 48)
+        end
     end
 
     if tankAttackButton then
         tankAttackButton:ClearAllPoints()
-        tankAttackButton:SetWidth(120)
-        tankAttackButton:SetHeight(24)
-        tankAttackButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 150, 20)
+        if summonButton then
+            tankAttackButton:SetPoint("LEFT", summonButton, "RIGHT", 12, 0)
+        else
+            tankAttackButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 330, 48)
+        end
     end
 
     if saveButton then
         saveButton:ClearAllPoints()
-        saveButton:SetWidth(100)
+        saveButton:SetWidth(88)
         saveButton:SetHeight(24)
-        saveButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -20, 20)
+        saveButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 20)
     end
 
     print("BotControl: layout applied")

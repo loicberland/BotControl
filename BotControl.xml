@@ -1,0 +1,137 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Frame name="BotControlFrame" parent="UIParent" hidden="true" movable="true" enableMouse="true" frameStrata="DIALOG" toplevel="true">
+        <Size>
+            <AbsDimension x="560" y="430"/>
+        </Size>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+        <Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+            <BackgroundInsets>
+                <AbsInset left="4" right="4" top="4" bottom="4"/>
+            </BackgroundInsets>
+            <TileSize>
+                <AbsValue val="16"/>
+            </TileSize>
+            <EdgeSize>
+                <AbsValue val="16"/>
+            </EdgeSize>
+        </Backdrop>
+        <Color r="0.05" g="0.05" b="0.05" a="0.92"/>
+        <Layers>
+            <Layer level="OVERLAY">
+                <FontString name="$parentTitle" inherits="GameFontNormalLarge">
+                    <Anchors>
+                        <Anchor point="TOP" x="0" y="-14"/>
+                    </Anchors>
+                    <Text>BotControl</Text>
+                </FontString>
+                <FontString name="$parentNamesHeader" inherits="GameFontNormal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="26" y="-44"/>
+                    </Anchors>
+                    <Text>Bot names</Text>
+                </FontString>
+                <FontString name="$parentBuildsHeader" inherits="GameFontNormal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="296" y="-44"/>
+                    </Anchors>
+                    <Text>Builds</Text>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <Button name="$parentCloseButton" inherits="UIPanelCloseButton">
+                <Anchors>
+                    <Anchor point="TOPRIGHT" x="-6" y="-6"/>
+                </Anchors>
+            </Button>
+            <Button name="$parentSaveButton" inherits="UIPanelButtonTemplate" text="Save">
+                <Size>
+                    <AbsDimension x="90" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="BOTTOMRIGHT" x="-20" y="20"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_SaveButton_OnClick();</OnClick>
+                </Scripts>
+            </Button>
+            <Button name="$parentComposeGroupButton" inherits="UIPanelButtonTemplate" text="Compose group">
+                <Size>
+                    <AbsDimension x="110" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="BOTTOMLEFT" x="20" y="56"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("ComposeGroup");</OnClick>
+                </Scripts>
+            </Button>
+            <Button name="$parentBuildButton" inherits="UIPanelButtonTemplate" text="Build">
+                <Size>
+                    <AbsDimension x="80" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="$parentComposeGroupButton" relativePoint="RIGHT" x="10" y="0"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("Build");</OnClick>
+                </Scripts>
+            </Button>
+            <Button name="$parentInitButton" inherits="UIPanelButtonTemplate" text="Init">
+                <Size>
+                    <AbsDimension x="80" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="$parentBuildButton" relativePoint="RIGHT" x="10" y="0"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("Init");</OnClick>
+                </Scripts>
+            </Button>
+            <Button name="$parentSummonDistanceButton" inherits="UIPanelButtonTemplate" text="Summon distance">
+                <Size>
+                    <AbsDimension x="120" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="BOTTOMLEFT" x="20" y="24"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("SummonDistance");</OnClick>
+                </Scripts>
+            </Button>
+            <Button name="$parentSummonTankButton" inherits="UIPanelButtonTemplate" text="Summon tank">
+                <Size>
+                    <AbsDimension x="100" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="$parentSummonDistanceButton" relativePoint="RIGHT" x="10" y="0"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("SummonTank");</OnClick>
+                </Scripts>
+            </Button>
+            <Button name="$parentTankAttackButton" inherits="UIPanelButtonTemplate" text="Tank attack">
+                <Size>
+                    <AbsDimension x="100" y="24"/>
+                </Size>
+                <Anchors>
+                    <Anchor point="LEFT" relativeTo="$parentSummonTankButton" relativePoint="RIGHT" x="10" y="0"/>
+                </Anchors>
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("TankAttack");</OnClick>
+                </Scripts>
+            </Button>
+        </Frames>
+        <Scripts>
+            <OnLoad>BotControl_OnLoad(self);</OnLoad>
+            <OnMouseDown>
+                if button == "LeftButton" then
+                    self:StartMoving();
+                end
+            </OnMouseDown>
+            <OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+        </Scripts>
+    </Frame>
+</Ui>

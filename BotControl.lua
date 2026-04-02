@@ -285,31 +285,102 @@ function BotControl.RefreshProfileList()
     end
 end
 
+function BotControl.CleanupButtonTemplate(button)
+    local buttonName
+    local region
+    local regions
+    local index
+
+    if not button then
+        return
+    end
+
+    if button:GetFontString() then
+        button:GetFontString():SetText("")
+        button:GetFontString():Hide()
+    end
+
+    buttonName = button:GetName()
+    if buttonName then
+        region = getglobal(buttonName .. "Left")
+        if region then
+            region:SetTexture(nil)
+            region:Hide()
+        end
+
+        region = getglobal(buttonName .. "Middle")
+        if region then
+            region:SetTexture(nil)
+            region:Hide()
+        end
+
+        region = getglobal(buttonName .. "Right")
+        if region then
+            region:SetTexture(nil)
+            region:Hide()
+        end
+
+        region = getglobal(buttonName .. "LeftDisabled")
+        if region then
+            region:SetTexture(nil)
+            region:Hide()
+        end
+
+        region = getglobal(buttonName .. "MiddleDisabled")
+        if region then
+            region:SetTexture(nil)
+            region:Hide()
+        end
+
+        region = getglobal(buttonName .. "RightDisabled")
+        if region then
+            region:SetTexture(nil)
+            region:Hide()
+        end
+    end
+
+    regions = { button:GetRegions() }
+    for index = 1, table.getn(regions) do
+        region = regions[index]
+        if region and region ~= button:GetNormalTexture() and region ~= button:GetPushedTexture() and region ~= button:GetHighlightTexture() and region ~= button:GetDisabledTexture() and region ~= button.iconTexture then
+            if region.GetObjectType and region:GetObjectType() == "FontString" then
+                region:SetText("")
+                region:Hide()
+            end
+        end
+    end
+end
+
 function BotControl_SetActionButtonIcon(button, texturePath, title, description)
     if not button then
         return
     end
 
+    BotControl.CleanupButtonTemplate(button)
     button:SetWidth(36)
     button:SetHeight(36)
     button:SetText("")
-    button:SetNormalTexture("Interface\\Buttons\\UI-Quickslot2")
-    button:SetPushedTexture("Interface\\Buttons\\UI-Quickslot-Depress")
-    button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
-    button:GetHighlightTexture():SetBlendMode("ADD")
+    button:SetNormalTexture(nil)
+    button:SetPushedTexture(nil)
+    button:SetDisabledTexture(nil)
+    button:SetHighlightTexture(nil)
 
     if not button.iconTexture then
         button.iconTexture = button:CreateTexture(nil, "ARTWORK")
-        button.iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", 5, -5)
-        button.iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -5, 5)
+        button.iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        button.iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
         button.iconTexture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     end
 
     button.iconTexture:SetTexture(texturePath)
+    button.iconTexture:SetVertexColor(1, 1, 1)
     button.tooltipTitle = title or ""
     button.tooltipDescription = description or ""
 
     button:SetScript("OnEnter", function(self)
+        if self.iconTexture then
+            self.iconTexture:SetVertexColor(1, 1, 1)
+        end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(self.tooltipTitle or "")
         if BotControl.HasValue(self.tooltipDescription) then
@@ -319,7 +390,27 @@ function BotControl_SetActionButtonIcon(button, texturePath, title, description)
     end)
 
     button:SetScript("OnLeave", function()
+        if button.iconTexture then
+            button.iconTexture:SetVertexColor(1, 1, 1)
+        end
         GameTooltip:Hide()
+    end)
+
+    button:SetScript("OnMouseDown", function(self)
+        if self.iconTexture then
+            self.iconTexture:SetPoint("TOPLEFT", self, "TOPLEFT", 3, -3)
+            self.iconTexture:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -1, 1)
+            self.iconTexture:SetVertexColor(0.8, 0.8, 0.8)
+        end
+    end)
+
+    button:SetScript("OnMouseUp", function(self)
+        if self.iconTexture then
+            self.iconTexture:ClearAllPoints()
+            self.iconTexture:SetPoint("TOPLEFT", self, "TOPLEFT", 2, -2)
+            self.iconTexture:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -2, 2)
+            self.iconTexture:SetVertexColor(1, 1, 1)
+        end
     end)
 end
 
@@ -969,9 +1060,13 @@ function BotControl_LayoutButtons()
 
     if saveButton then
         saveButton:ClearAllPoints()
+        saveButton:SetText("Save")
+        if saveButton:GetFontString() then
+            saveButton:GetFontString():Show()
+        end
         saveButton:SetWidth(88)
         saveButton:SetHeight(24)
-        saveButton:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -24, 20)
+        saveButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 20)
     end
 
     print("BotControl: layout applied")

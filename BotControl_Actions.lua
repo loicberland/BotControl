@@ -17,9 +17,33 @@ BotControlActions.definitions = {
         label = "Summon",
         builder = "SummonCommands"
     },
+    InitBots = {
+        label = "Init bots",
+        builder = "InitBotsCommands"
+    },
     TankAttack = {
         label = "Tank attack",
         builder = "TankAttackCommands"
+    },
+    AttackDPS = {
+        label = "Attack DPS",
+        builder = "AttackDPSCommands"
+    },
+    Follow = {
+        label = "Follow",
+        builder = "FollowCommands"
+    },
+    Passive = {
+        label = "Passive",
+        builder = "PassiveCommands"
+    },
+    Stay = {
+        label = "Stay",
+        builder = "StayCommands"
+    },
+    Used = {
+        label = "Used",
+        builder = "UsedCommands"
     }
 }
 
@@ -127,6 +151,84 @@ function BotControlActions:TankAttackCommands()
     return commands
 end
 
+function BotControlActions:AttackDPSCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local dpsNames = {
+        cfg.dps1Name,
+        cfg.dps2Name,
+        cfg.dps3Name
+    }
+    local index
+    local name
+
+    for index = 1, table.getn(dpsNames) do
+        name = dpsNames[index]
+        AddWhisper(commands, name, "attack")
+    end
+
+    return commands
+end
+
+function BotControlActions:FollowCommands()
+    local commands = {}
+
+    AddParty(commands, "follow")
+    AddParty(commands, "co -passive")
+
+    return commands
+end
+
+function BotControlActions:PassiveCommands()
+    local commands = {}
+
+    AddParty(commands, "flee")
+
+    return commands
+end
+
+function BotControlActions:StayCommands()
+    local commands = {}
+
+    AddParty(commands, "stay")
+
+    return commands
+end
+
+function BotControlActions:UsedCommands()
+    local commands = {}
+
+    AddParty(commands, "u go")
+
+    return commands
+end
+
+function BotControlActions:InitBotsCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local names = {
+        cfg.tankName,
+        cfg.healName,
+        cfg.dps1Name,
+        cfg.dps2Name,
+        cfg.dps3Name
+    }
+    local index
+    local name
+
+    for index = 1, table.getn(names) do
+        name = names[index]
+        if BotControl.HasValue(name) then
+            AddSlash(commands, ".bot init " .. name)
+            AddSlash(commands, ".bot learn " .. name)
+            AddSlash(commands, ".bot gear " .. name)
+            AddSlash(commands, ".bot prepare " .. name)
+        end
+    end
+
+    return commands
+end
+
 function BotControlActions:ComposeGroupCommands()
     local cfg = self:GetConfig()
     local commands = {}
@@ -192,6 +294,42 @@ end
 function BotControl_Action_Summon()
     if BotControlActions and BotControlActions.RunAction then
         BotControlActions:RunAction("Summon")
+    end
+end
+
+function BotControl_Action_InitBots()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("InitBots")
+    end
+end
+
+function BotControl_Action_AttackDPS()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("AttackDPS")
+    end
+end
+
+function BotControl_Action_Follow()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Follow")
+    end
+end
+
+function BotControl_Action_Passive()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Passive")
+    end
+end
+
+function BotControl_Action_Stay()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Stay")
+    end
+end
+
+function BotControl_Action_Used()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Used")
     end
 end
 

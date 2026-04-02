@@ -11,12 +11,15 @@ BotControl.currentActionsSubTab = "Config"
 
 BotControl.PROFILES_FRAME_WIDTH = 560
 BotControl.PROFILES_FRAME_HEIGHT = 350
-BotControl.ACTIONS_CONFIG_FRAME_WIDTH = 420
-BotControl.ACTIONS_CONFIG_FRAME_HEIGHT = 240
-BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 300
-BotControl.ACTIONS_COMBAT_FRAME_HEIGHT = 190
+BotControl.ACTIONS_CONFIG_FRAME_WIDTH = 400
+BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 360
+BotControl.ACTIONS_BASE_HEIGHT = 146
 BotControl.ACTIONS_ICON_SIZE = 36
 BotControl.ACTIONS_ICON_SPACING = 12
+BotControl.ACTIONS_ROW_SPACING = 16
+BotControl.ACTIONS_ICONS_PER_ROW = 3
+BotControl.COMMAND_INTERVAL = 0.15
+BotControl.commandQueue = {}
 
 BotControl.ACTION_BUTTON_CONFIG = {
     ComposeGroup = {
@@ -44,10 +47,40 @@ BotControl.ACTION_BUTTON_CONFIG = {
         title = "Invocation",
         description = "Invoque tous les bots configures"
     },
+    InitBots = {
+        texture = "Interface\\Icons\\INV_Misc_Gear_01",
+        title = "Initialisation bots",
+        description = "Lance .bot init, .bot learn, .bot gear et .bot prepare"
+    },
     TankAttack = {
         texture = "Interface\\Icons\\Ability_Warrior_Charge",
         title = "Attaque du tank",
         description = "Ordonne au tank d'attaquer, les autres attendent"
+    },
+    AttackDPS = {
+        texture = "Interface\\Icons\\Ability_BackStab",
+        title = "Attaque DPS",
+        description = "Ordonne aux DPS d'attaquer"
+    },
+    Follow = {
+        texture = "Interface\\Icons\\Ability_Hunter_Pathfinding",
+        title = "Suivre",
+        description = "Ordonne a tout le groupe de suivre"
+    },
+    Passive = {
+        texture = "Interface\\Icons\\Ability_Rogue_FeignDeath",
+        title = "Passif",
+        description = "Ordonne au groupe de fuir / se desengager"
+    },
+    Stay = {
+        texture = "Interface\\Icons\\Spell_Nature_TimeStop",
+        title = "Rester sur place",
+        description = "Ordonne au groupe de rester en place"
+    },
+    Used = {
+        texture = "Interface\\Icons\\INV_Misc_Wrench_01",
+        title = "Utiliser",
+        description = "Lance la commande /p u go"
     }
 }
 
@@ -83,6 +116,8 @@ BotControl.FIELD_DEFINITIONS = {
 }
 
 local eventFrame = CreateFrame("Frame", "BotControlEventFrame")
+local commandQueueFrame = CreateFrame("Frame", "BotControlCommandQueueFrame")
+commandQueueFrame:Hide()
 
 function BotControl.Trim(text)
     if not text then
@@ -215,6 +250,8 @@ function BotControl_UpdateFrameSizeForView(mainTab, subTab)
     local frame = BotControlFrame
     local width
     local height
+    local iconCount
+    local rows
 
     if not frame then
         return
@@ -224,16 +261,28 @@ function BotControl_UpdateFrameSizeForView(mainTab, subTab)
         BotControl.currentTab = "Profiles"
         width = BotControl.PROFILES_FRAME_WIDTH
         height = BotControl.PROFILES_FRAME_HEIGHT
-    elseif subTab == "Combat" then
-        BotControl.currentTab = "Actions"
-        BotControl.currentActionsSubTab = "Combat"
-        width = BotControl.ACTIONS_COMBAT_FRAME_WIDTH
-        height = BotControl.ACTIONS_COMBAT_FRAME_HEIGHT
     else
         BotControl.currentTab = "Actions"
-        BotControl.currentActionsSubTab = "Config"
-        width = BotControl.ACTIONS_CONFIG_FRAME_WIDTH
-        height = BotControl.ACTIONS_CONFIG_FRAME_HEIGHT
+        if subTab == "Combat" then
+            BotControl.currentActionsSubTab = "Combat"
+            width = BotControl.ACTIONS_COMBAT_FRAME_WIDTH
+            if BotControl_ActionCombatElements and table.getn(BotControl_ActionCombatElements) > 0 then
+                iconCount = table.getn(BotControl_ActionCombatElements)
+            else
+                iconCount = 6
+            end
+        else
+            BotControl.currentActionsSubTab = "Config"
+            width = BotControl.ACTIONS_CONFIG_FRAME_WIDTH
+            if BotControl_ActionConfigElements and table.getn(BotControl_ActionConfigElements) > 0 then
+                iconCount = table.getn(BotControl_ActionConfigElements)
+            else
+                iconCount = 6
+            end
+        end
+
+        rows = math.ceil(iconCount / BotControl.ACTIONS_ICONS_PER_ROW)
+        height = BotControl.ACTIONS_BASE_HEIGHT + (rows * (BotControl.ACTIONS_ICON_SIZE + BotControl.ACTIONS_ROW_SPACING))
     end
 
     frame:SetWidth(width)
@@ -486,8 +535,26 @@ function BotControl.StyleActionButtons()
     config = BotControl.ACTION_BUTTON_CONFIG.Summon
     BotControl_SetActionButtonIcon(BotControlFrameSummonButton, config.texture, config.title, config.description)
 
+    config = BotControl.ACTION_BUTTON_CONFIG.InitBots
+    BotControl_SetActionButtonIcon(BotControlInitBotsButton, config.texture, config.title, config.description)
+
     config = BotControl.ACTION_BUTTON_CONFIG.TankAttack
     BotControl_SetActionButtonIcon(BotControlFrameTankAttackButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.AttackDPS
+    BotControl_SetActionButtonIcon(BotControlAttackDPSButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Follow
+    BotControl_SetActionButtonIcon(BotControlFollowButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Passive
+    BotControl_SetActionButtonIcon(BotControlPassiveButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Stay
+    BotControl_SetActionButtonIcon(BotControlStayButton, config.texture, config.title, config.description)
+
+    config = BotControl.ACTION_BUTTON_CONFIG.Used
+    BotControl_SetActionButtonIcon(BotControlUsedButton, config.texture, config.title, config.description)
 end
 
 function BotControl.StyleProfileControls()
@@ -551,7 +618,13 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ActionElements, BotControlFrameInitButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlFullSetupButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlFrameSummonButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlInitBotsButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlFrameTankAttackButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlAttackDPSButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlFollowButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlPassiveButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlStayButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlUsedButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlActionsSubTabConfig)
     BotControl.AddElement(BotControl_ActionElements, BotControlActionsSubTabCombat)
 
@@ -563,8 +636,14 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameInitButton)
     BotControl.AddElement(BotControl_ActionConfigElements, BotControlFullSetupButton)
     BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameSummonButton)
+    BotControl.AddElement(BotControl_ActionConfigElements, BotControlInitBotsButton)
 
     BotControl.AddElement(BotControl_ActionCombatElements, BotControlFrameTankAttackButton)
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlAttackDPSButton)
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlFollowButton)
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlPassiveButton)
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlStayButton)
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlUsedButton)
 end
 
 function BotControl_ShowActionsSubTab(tabName)
@@ -683,6 +762,12 @@ end
 
 function BotControl.CreateButtons(frame)
     local fullSetupButton
+    local initBotsButton
+    local attackDpsButton
+    local followButton
+    local passiveButton
+    local stayButton
+    local usedButton
     local saveProfileButton
     local loadProfileButton
     local deleteProfileButton
@@ -746,6 +831,66 @@ function BotControl.CreateButtons(frame)
         fullSetupButton:SetHeight(24)
         fullSetupButton:SetScript("OnClick", function()
             BotControl_RunNamedAction("FullSetup")
+        end)
+    end
+
+    if not BotControlInitBotsButton then
+        initBotsButton = CreateFrame("Button", "BotControlInitBotsButton", frame, "UIPanelButtonTemplate")
+        initBotsButton:SetText("Init bots")
+        initBotsButton:SetWidth(110)
+        initBotsButton:SetHeight(24)
+        initBotsButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("InitBots")
+        end)
+    end
+
+    if not BotControlAttackDPSButton then
+        attackDpsButton = CreateFrame("Button", "BotControlAttackDPSButton", frame, "UIPanelButtonTemplate")
+        attackDpsButton:SetText("Attack DPS")
+        attackDpsButton:SetWidth(110)
+        attackDpsButton:SetHeight(24)
+        attackDpsButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("AttackDPS")
+        end)
+    end
+
+    if not BotControlFollowButton then
+        followButton = CreateFrame("Button", "BotControlFollowButton", frame, "UIPanelButtonTemplate")
+        followButton:SetText("Follow")
+        followButton:SetWidth(110)
+        followButton:SetHeight(24)
+        followButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("Follow")
+        end)
+    end
+
+    if not BotControlPassiveButton then
+        passiveButton = CreateFrame("Button", "BotControlPassiveButton", frame, "UIPanelButtonTemplate")
+        passiveButton:SetText("Passif")
+        passiveButton:SetWidth(110)
+        passiveButton:SetHeight(24)
+        passiveButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("Passive")
+        end)
+    end
+
+    if not BotControlStayButton then
+        stayButton = CreateFrame("Button", "BotControlStayButton", frame, "UIPanelButtonTemplate")
+        stayButton:SetText("Stay")
+        stayButton:SetWidth(110)
+        stayButton:SetHeight(24)
+        stayButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("Stay")
+        end)
+    end
+
+    if not BotControlUsedButton then
+        usedButton = CreateFrame("Button", "BotControlUsedButton", frame, "UIPanelButtonTemplate")
+        usedButton:SetText("Used")
+        usedButton:SetWidth(110)
+        usedButton:SetHeight(24)
+        usedButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("Used")
         end)
     end
 
@@ -1069,9 +1214,16 @@ function BotControl_LayoutButtons()
     local initButton = BotControlFrameInitButton
     local fullSetupButton = BotControlFullSetupButton
     local summonButton = BotControlFrameSummonButton
+    local initBotsButton = BotControlInitBotsButton
     local tankAttackButton = BotControlFrameTankAttackButton
+    local attackDpsButton = BotControlAttackDPSButton
+    local followButton = BotControlFollowButton
+    local passiveButton = BotControlPassiveButton
+    local stayButton = BotControlStayButton
+    local usedButton = BotControlUsedButton
     local saveButton = BotControlFrameSaveButton
     local iconSpacing = BotControl.ACTIONS_ICON_SPACING
+    local rowSpacing = BotControl.ACTIONS_ROW_SPACING
     local actionsAnchor
 
     if not frame then
@@ -1181,7 +1333,9 @@ function BotControl_LayoutButtons()
         end
     end
 
-    if configSubTabButton then
+    if BotControl.currentTab == "Actions" and BotControl.currentActionsSubTab == "Combat" and combatSubTabButton then
+        actionsAnchor = combatSubTabButton
+    elseif configSubTabButton then
         actionsAnchor = configSubTabButton
     else
         actionsAnchor = actionsTabButton
@@ -1190,10 +1344,45 @@ function BotControl_LayoutButtons()
     if BotControl.currentTab == "Actions" and BotControl.currentActionsSubTab == "Combat" then
         if tankAttackButton then
             tankAttackButton:ClearAllPoints()
-            if combatSubTabButton then
-                tankAttackButton:SetPoint("TOP", combatSubTabButton, "BOTTOM", 0, -28)
+            if actionsAnchor then
+                tankAttackButton:SetPoint("TOPLEFT", actionsAnchor, "BOTTOMLEFT", 0, -24)
             else
-                tankAttackButton:SetPoint("TOP", frame, "TOP", 0, -104)
+                tankAttackButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -104)
+            end
+        end
+
+        if attackDpsButton then
+            attackDpsButton:ClearAllPoints()
+            if tankAttackButton then
+                attackDpsButton:SetPoint("LEFT", tankAttackButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
+        if followButton then
+            followButton:ClearAllPoints()
+            if attackDpsButton then
+                followButton:SetPoint("LEFT", attackDpsButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
+        if passiveButton then
+            passiveButton:ClearAllPoints()
+            if tankAttackButton then
+                passiveButton:SetPoint("TOPLEFT", tankAttackButton, "BOTTOMLEFT", 0, -rowSpacing)
+            end
+        end
+
+        if stayButton then
+            stayButton:ClearAllPoints()
+            if passiveButton then
+                stayButton:SetPoint("LEFT", passiveButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
+        if usedButton then
+            usedButton:ClearAllPoints()
+            if stayButton then
+                usedButton:SetPoint("LEFT", stayButton, "RIGHT", iconSpacing, 0)
             end
         end
 
@@ -1211,6 +1400,9 @@ function BotControl_LayoutButtons()
         end
         if summonButton then
             summonButton:ClearAllPoints()
+        end
+        if initBotsButton then
+            initBotsButton:ClearAllPoints()
         end
     else
         if composeGroupButton then
@@ -1239,7 +1431,7 @@ function BotControl_LayoutButtons()
         if fullSetupButton then
             fullSetupButton:ClearAllPoints()
             if composeGroupButton then
-                fullSetupButton:SetPoint("TOPLEFT", composeGroupButton, "BOTTOMLEFT", 0, -16)
+                fullSetupButton:SetPoint("TOPLEFT", composeGroupButton, "BOTTOMLEFT", 0, -rowSpacing)
             end
         end
 
@@ -1250,13 +1442,30 @@ function BotControl_LayoutButtons()
             end
         end
 
+        if initBotsButton then
+            initBotsButton:ClearAllPoints()
+            if summonButton then
+                initBotsButton:SetPoint("LEFT", summonButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
         if tankAttackButton then
             tankAttackButton:ClearAllPoints()
-            if combatSubTabButton then
-                tankAttackButton:SetPoint("TOP", combatSubTabButton, "BOTTOM", 0, -28)
-            else
-                tankAttackButton:SetPoint("TOP", frame, "TOP", 0, -104)
-            end
+        end
+        if attackDpsButton then
+            attackDpsButton:ClearAllPoints()
+        end
+        if followButton then
+            followButton:ClearAllPoints()
+        end
+        if passiveButton then
+            passiveButton:ClearAllPoints()
+        end
+        if stayButton then
+            stayButton:ClearAllPoints()
+        end
+        if usedButton then
+            usedButton:ClearAllPoints()
         end
     end
 
@@ -1334,7 +1543,7 @@ function BotControl.ExecuteSlashCommand(command)
     end
 end
 
-function BotControl.RunCommand(command)
+function BotControl.ExecuteCommandNow(command)
     if type(command) == "string" then
         BotControl.ExecuteSlashCommand(command)
         return
@@ -1349,6 +1558,44 @@ function BotControl.RunCommand(command)
     elseif command.type == "SLASH" then
         BotControl.ExecuteSlashCommand(command.command)
     end
+end
+
+function BotControl.ProcessCommandQueue()
+    local command
+
+    if not BotControl.commandQueue or table.getn(BotControl.commandQueue) == 0 then
+        commandQueueFrame:Hide()
+        return
+    end
+
+    command = table.remove(BotControl.commandQueue, 1)
+    BotControl.ExecuteCommandNow(command)
+
+    if table.getn(BotControl.commandQueue) == 0 then
+        commandQueueFrame:Hide()
+    end
+end
+
+commandQueueFrame.elapsed = 0
+commandQueueFrame:SetScript("OnUpdate", function()
+    commandQueueFrame.elapsed = commandQueueFrame.elapsed + arg1
+
+    if commandQueueFrame.elapsed < BotControl.COMMAND_INTERVAL then
+        return
+    end
+
+    commandQueueFrame.elapsed = 0
+    BotControl.ProcessCommandQueue()
+end)
+
+function BotControl.RunCommand(command)
+    if not command then
+        return
+    end
+
+    table.insert(BotControl.commandQueue, command)
+    commandQueueFrame.elapsed = BotControl.COMMAND_INTERVAL
+    commandQueueFrame:Show()
 end
 
 function BotControl.RunCommands(commands)
@@ -1427,6 +1674,18 @@ function BotControl_RunNamedAction(actionName)
         BotControl_Action_Init()
     elseif actionName == "Summon" then
         BotControl_Action_Summon()
+    elseif actionName == "InitBots" then
+        BotControl_Action_InitBots()
+    elseif actionName == "AttackDPS" then
+        BotControl_Action_AttackDPS()
+    elseif actionName == "Follow" then
+        BotControl_Action_Follow()
+    elseif actionName == "Passive" then
+        BotControl_Action_Passive()
+    elseif actionName == "Stay" then
+        BotControl_Action_Stay()
+    elseif actionName == "Used" then
+        BotControl_Action_Used()
     else
         BotControlActions:RunAction(actionName)
     end

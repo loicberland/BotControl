@@ -1521,6 +1521,7 @@ end
 
 function BotControl.ExecuteSlashCommand(command)
     local editBox
+    local targetEditBox
 
     if not BotControl.HasValue(command) then
         return
@@ -1534,12 +1535,25 @@ function BotControl.ExecuteSlashCommand(command)
 
     ChatFrame_OpenChat(command, DEFAULT_CHAT_FRAME)
     if ChatFrameEditBox and ChatFrameEditBox:GetText() == command then
-        ChatEdit_SendText(ChatFrameEditBox, 0)
+        targetEditBox = ChatFrameEditBox
+        ChatEdit_SendText(targetEditBox, 0)
     elseif DEFAULT_CHAT_FRAME.editBox and DEFAULT_CHAT_FRAME.editBox:GetText() == command then
-        ChatEdit_SendText(DEFAULT_CHAT_FRAME.editBox, 0)
+        targetEditBox = DEFAULT_CHAT_FRAME.editBox
+        ChatEdit_SendText(targetEditBox, 0)
     else
         editBox:SetText(command)
-        ChatEdit_SendText(editBox, 0)
+        targetEditBox = editBox
+        ChatEdit_SendText(targetEditBox, 0)
+    end
+
+    if targetEditBox then
+        targetEditBox:SetText("")
+        if ChatEdit_DeactivateChat then
+            ChatEdit_DeactivateChat(targetEditBox)
+        else
+            targetEditBox:ClearFocus()
+            targetEditBox:Hide()
+        end
     end
 end
 
@@ -1589,6 +1603,10 @@ commandQueueFrame:SetScript("OnUpdate", function()
 end)
 
 function BotControl.RunCommand(command)
+    BotControl.ExecuteCommandNow(command)
+end
+
+function BotControl.QueueCommand(command)
     if not command then
         return
     end
@@ -1607,6 +1625,18 @@ function BotControl.RunCommands(commands)
 
     for index = 1, table.getn(commands) do
         BotControl.RunCommand(commands[index])
+    end
+end
+
+function BotControl.RunCommandsQueued(commands)
+    local index
+
+    if type(commands) ~= "table" then
+        return
+    end
+
+    for index = 1, table.getn(commands) do
+        BotControl.QueueCommand(commands[index])
     end
 end
 

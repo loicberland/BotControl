@@ -298,8 +298,12 @@ function BotControl_Action_Summon()
 end
 
 function BotControl_Action_InitBots()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("InitBots")
+    local commands
+
+    if BotControlActions and BotControlActions.InitBotsCommands and BotControl.RunCommandsQueued then
+        BotControl.Print("Running action: Init bots")
+        commands = BotControlActions:InitBotsCommands()
+        BotControl.RunCommandsQueued(commands)
     end
 end
 

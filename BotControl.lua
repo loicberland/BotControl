@@ -1,8 +1,22 @@
 BotControl = {}
 BotControl_ProfileElements = {}
 BotControl_ActionElements = {}
+BotControl_ActionSubTabElements = {}
+BotControl_ActionConfigElements = {}
+BotControl_ActionCombatElements = {}
 BotControl.selectedProfileName = nil
 BotControl_SelectedProfileName = nil
+BotControl.currentTab = "Profiles"
+BotControl.currentActionsSubTab = "Config"
+
+BotControl.PROFILES_FRAME_WIDTH = 560
+BotControl.PROFILES_FRAME_HEIGHT = 350
+BotControl.ACTIONS_CONFIG_FRAME_WIDTH = 420
+BotControl.ACTIONS_CONFIG_FRAME_HEIGHT = 240
+BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 300
+BotControl.ACTIONS_COMBAT_FRAME_HEIGHT = 190
+BotControl.ACTIONS_ICON_SIZE = 36
+BotControl.ACTIONS_ICON_SPACING = 12
 
 BotControl.ACTION_BUTTON_CONFIG = {
     ComposeGroup = {
@@ -23,7 +37,7 @@ BotControl.ACTION_BUTTON_CONFIG = {
     FullSetup = {
         texture = "Interface\\Icons\\Spell_Holy_BlessingOfStamina",
         title = "Preparation complete",
-        description = "Lance Build, Init et Summon"
+        description = "Lance Build, Init"
     },
     Summon = {
         texture = "Interface\\Icons\\Spell_Shadow_Teleport",
@@ -195,6 +209,46 @@ function BotControl.AddElement(targetTable, element)
     end
 
     table.insert(targetTable, element)
+end
+
+function BotControl_UpdateFrameSizeForView(mainTab, subTab)
+    local frame = BotControlFrame
+    local width
+    local height
+
+    if not frame then
+        return
+    end
+
+    if mainTab == "Profiles" then
+        BotControl.currentTab = "Profiles"
+        width = BotControl.PROFILES_FRAME_WIDTH
+        height = BotControl.PROFILES_FRAME_HEIGHT
+    elseif subTab == "Combat" then
+        BotControl.currentTab = "Actions"
+        BotControl.currentActionsSubTab = "Combat"
+        width = BotControl.ACTIONS_COMBAT_FRAME_WIDTH
+        height = BotControl.ACTIONS_COMBAT_FRAME_HEIGHT
+    else
+        BotControl.currentTab = "Actions"
+        BotControl.currentActionsSubTab = "Config"
+        width = BotControl.ACTIONS_CONFIG_FRAME_WIDTH
+        height = BotControl.ACTIONS_CONFIG_FRAME_HEIGHT
+    end
+
+    frame:SetWidth(width)
+    frame:SetHeight(height)
+    print("BotControl: Frame size -> " .. width .. "x" .. height)
+end
+
+function BotControl_UpdateFrameSize(viewName, iconCount)
+    if viewName == "Profiles" then
+        BotControl_UpdateFrameSizeForView("Profiles")
+    elseif viewName == "Combat" then
+        BotControl_UpdateFrameSizeForView("Actions", "Combat")
+    else
+        BotControl_UpdateFrameSizeForView("Actions", "Config")
+    end
 end
 
 function BotControl.GetSortedProfileNames()
@@ -461,6 +515,9 @@ function BotControl.RegisterTabElements(frame)
 
     BotControl_ProfileElements = {}
     BotControl_ActionElements = {}
+    BotControl_ActionSubTabElements = {}
+    BotControl_ActionConfigElements = {}
+    BotControl_ActionCombatElements = {}
 
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameNamesHeader)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameBuildsHeader)
@@ -495,6 +552,71 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ActionElements, BotControlFullSetupButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlFrameSummonButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlFrameTankAttackButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlActionsSubTabConfig)
+    BotControl.AddElement(BotControl_ActionElements, BotControlActionsSubTabCombat)
+
+    BotControl.AddElement(BotControl_ActionSubTabElements, BotControlActionsSubTabConfig)
+    BotControl.AddElement(BotControl_ActionSubTabElements, BotControlActionsSubTabCombat)
+
+    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameComposeGroupButton)
+    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameBuildButton)
+    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameInitButton)
+    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFullSetupButton)
+    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameSummonButton)
+
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlFrameTankAttackButton)
+end
+
+function BotControl_ShowActionsSubTab(tabName)
+    local index
+    local element
+
+    if tabName ~= "Combat" then
+        tabName = "Config"
+    end
+
+    BotControl.currentActionsSubTab = tabName
+
+    for index = 1, table.getn(BotControl_ActionSubTabElements) do
+        element = BotControl_ActionSubTabElements[index]
+        if element then
+            element:Show()
+        end
+    end
+
+    if tabName == "Combat" then
+        for index = 1, table.getn(BotControl_ActionConfigElements) do
+            element = BotControl_ActionConfigElements[index]
+            if element then
+                element:Hide()
+            end
+        end
+
+        for index = 1, table.getn(BotControl_ActionCombatElements) do
+            element = BotControl_ActionCombatElements[index]
+            if element then
+                element:Show()
+            end
+        end
+    else
+        for index = 1, table.getn(BotControl_ActionCombatElements) do
+            element = BotControl_ActionCombatElements[index]
+            if element then
+                element:Hide()
+            end
+        end
+
+        for index = 1, table.getn(BotControl_ActionConfigElements) do
+            element = BotControl_ActionConfigElements[index]
+            if element then
+                element:Show()
+            end
+        end
+    end
+
+    BotControl_UpdateFrameSizeForView("Actions", tabName)
+    BotControl_LayoutButtons()
+    print("BotControl: Actions subtab -> " .. tabName)
 end
 
 function BotControl_ShowTab(tabName)
@@ -502,6 +624,8 @@ function BotControl_ShowTab(tabName)
     local element
 
     if tabName == "Actions" then
+        BotControl.currentTab = "Actions"
+
         for index = 1, table.getn(BotControl_ProfileElements) do
             element = BotControl_ProfileElements[index]
             if element then
@@ -515,8 +639,11 @@ function BotControl_ShowTab(tabName)
                 element:Show()
             end
         end
+
+        BotControl_ShowActionsSubTab("Config")
     else
         tabName = "Profiles"
+        BotControl.currentTab = "Profiles"
 
         for index = 1, table.getn(BotControl_ProfileElements) do
             element = BotControl_ProfileElements[index]
@@ -533,6 +660,8 @@ function BotControl_ShowTab(tabName)
         end
 
         BotControl.RefreshProfileList()
+        BotControl_UpdateFrameSizeForView("Profiles")
+        BotControl_LayoutButtons()
     end
 
     print("BotControl: switched to " .. tabName)
@@ -557,6 +686,8 @@ function BotControl.CreateButtons(frame)
     local saveProfileButton
     local loadProfileButton
     local deleteProfileButton
+    local configSubTabButton
+    local combatSubTabButton
     local profileListLabel
     local profileListFrame
     local profileListButton
@@ -585,6 +716,26 @@ function BotControl.CreateButtons(frame)
         actionsTabButton:SetHeight(22)
         actionsTabButton:SetScript("OnClick", function()
             BotControl_ShowTab("Actions")
+        end)
+    end
+
+    if not BotControlActionsSubTabConfig then
+        configSubTabButton = CreateFrame("Button", "BotControlActionsSubTabConfig", frame, "UIPanelButtonTemplate")
+        configSubTabButton:SetText("Config")
+        configSubTabButton:SetWidth(78)
+        configSubTabButton:SetHeight(20)
+        configSubTabButton:SetScript("OnClick", function()
+            BotControl_ShowActionsSubTab("Config")
+        end)
+    end
+
+    if not BotControlActionsSubTabCombat then
+        combatSubTabButton = CreateFrame("Button", "BotControlActionsSubTabCombat", frame, "UIPanelButtonTemplate")
+        combatSubTabButton:SetText("Combat")
+        combatSubTabButton:SetWidth(78)
+        combatSubTabButton:SetHeight(20)
+        combatSubTabButton:SetScript("OnClick", function()
+            BotControl_ShowActionsSubTab("Combat")
         end)
     end
 
@@ -902,6 +1053,8 @@ function BotControl_LayoutButtons()
     local frame = BotControlFrame
     local profilesTabButton = BotControlTabProfiles
     local actionsTabButton = BotControlTabActions
+    local configSubTabButton = BotControlActionsSubTabConfig
+    local combatSubTabButton = BotControlActionsSubTabCombat
     local namesHeader = BotControlFrameNamesHeader
     local buildsHeader = BotControlFrameBuildsHeader
     local profileNameLabel = BotControlFrameProfileNameLabel
@@ -918,6 +1071,8 @@ function BotControl_LayoutButtons()
     local summonButton = BotControlFrameSummonButton
     local tankAttackButton = BotControlFrameTankAttackButton
     local saveButton = BotControlFrameSaveButton
+    local iconSpacing = BotControl.ACTIONS_ICON_SPACING
+    local actionsAnchor
 
     if not frame then
         return
@@ -934,6 +1089,24 @@ function BotControl_LayoutButtons()
             actionsTabButton:SetPoint("LEFT", profilesTabButton, "RIGHT", 10, 0)
         else
             actionsTabButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 120, -30)
+        end
+    end
+
+    if configSubTabButton then
+        configSubTabButton:ClearAllPoints()
+        configSubTabButton:SetWidth(78)
+        configSubTabButton:SetHeight(20)
+        configSubTabButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -60)
+    end
+
+    if combatSubTabButton then
+        combatSubTabButton:ClearAllPoints()
+        combatSubTabButton:SetWidth(78)
+        combatSubTabButton:SetHeight(20)
+        if configSubTabButton then
+            combatSubTabButton:SetPoint("LEFT", configSubTabButton, "RIGHT", 8, 0)
+        else
+            combatSubTabButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 106, -60)
         end
     end
 
@@ -1008,53 +1181,82 @@ function BotControl_LayoutButtons()
         end
     end
 
-    if composeGroupButton then
-        composeGroupButton:ClearAllPoints()
-        composeGroupButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 234, 96)
+    if configSubTabButton then
+        actionsAnchor = configSubTabButton
+    else
+        actionsAnchor = actionsTabButton
     end
 
-    if buildButton then
-        buildButton:ClearAllPoints()
-        if composeGroupButton then
-            buildButton:SetPoint("LEFT", composeGroupButton, "RIGHT", 12, 0)
-        else
-            buildButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 282, 96)
+    if BotControl.currentTab == "Actions" and BotControl.currentActionsSubTab == "Combat" then
+        if tankAttackButton then
+            tankAttackButton:ClearAllPoints()
+            if combatSubTabButton then
+                tankAttackButton:SetPoint("TOP", combatSubTabButton, "BOTTOM", 0, -28)
+            else
+                tankAttackButton:SetPoint("TOP", frame, "TOP", 0, -104)
+            end
         end
-    end
 
-    if initButton then
-        initButton:ClearAllPoints()
+        if composeGroupButton then
+            composeGroupButton:ClearAllPoints()
+        end
         if buildButton then
-            initButton:SetPoint("LEFT", buildButton, "RIGHT", 12, 0)
-        else
-            initButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 330, 96)
+            buildButton:ClearAllPoints()
         end
-    end
-
-    if fullSetupButton then
-        fullSetupButton:ClearAllPoints()
-        if composeGroupButton then
-            fullSetupButton:SetPoint("TOP", composeGroupButton, "BOTTOM", 0, -12)
-        else
-            fullSetupButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 234, 48)
+        if initButton then
+            initButton:ClearAllPoints()
         end
-    end
-
-    if summonButton then
-        summonButton:ClearAllPoints()
         if fullSetupButton then
-            summonButton:SetPoint("LEFT", fullSetupButton, "RIGHT", 12, 0)
-        else
-            summonButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 282, 48)
+            fullSetupButton:ClearAllPoints()
         end
-    end
-
-    if tankAttackButton then
-        tankAttackButton:ClearAllPoints()
         if summonButton then
-            tankAttackButton:SetPoint("LEFT", summonButton, "RIGHT", 12, 0)
-        else
-            tankAttackButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 330, 48)
+            summonButton:ClearAllPoints()
+        end
+    else
+        if composeGroupButton then
+            composeGroupButton:ClearAllPoints()
+            if actionsAnchor then
+                composeGroupButton:SetPoint("TOPLEFT", actionsAnchor, "BOTTOMLEFT", 0, -24)
+            else
+                composeGroupButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -104)
+            end
+        end
+
+        if buildButton then
+            buildButton:ClearAllPoints()
+            if composeGroupButton then
+                buildButton:SetPoint("LEFT", composeGroupButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
+        if initButton then
+            initButton:ClearAllPoints()
+            if buildButton then
+                initButton:SetPoint("LEFT", buildButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
+        if fullSetupButton then
+            fullSetupButton:ClearAllPoints()
+            if composeGroupButton then
+                fullSetupButton:SetPoint("TOPLEFT", composeGroupButton, "BOTTOMLEFT", 0, -16)
+            end
+        end
+
+        if summonButton then
+            summonButton:ClearAllPoints()
+            if fullSetupButton then
+                summonButton:SetPoint("LEFT", fullSetupButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
+        if tankAttackButton then
+            tankAttackButton:ClearAllPoints()
+            if combatSubTabButton then
+                tankAttackButton:SetPoint("TOP", combatSubTabButton, "BOTTOM", 0, -28)
+            else
+                tankAttackButton:SetPoint("TOP", frame, "TOP", 0, -104)
+            end
         end
     end
 
@@ -1186,6 +1388,12 @@ end
 function BotControl.OnFrameShow()
     BotControl_LayoutButtons()
     BotControl.RefreshProfileList()
+
+    if BotControl.currentTab == "Actions" then
+        BotControl_UpdateFrameSizeForView("Actions", BotControl.currentActionsSubTab or "Config")
+    else
+        BotControl_UpdateFrameSizeForView("Profiles")
+    end
 end
 
 function BotControl_OnLoad(frame)
@@ -1196,6 +1404,7 @@ function BotControl_OnLoad(frame)
     BotControl.InitializeFrame(frame)
     BotControl_LayoutButtons()
     BotControl.RefreshProfileList()
+    BotControl_UpdateFrameSizeForView("Profiles")
     frame:SetScript("OnShow", BotControl.OnFrameShow)
     BotControl_ShowTab("Profiles")
     eventFrame:RegisterEvent("ADDON_LOADED")

@@ -205,8 +205,4 @@ function BotControl_Action_FullSetup()
     if BotControl_Action_Init then
         BotControl_Action_Init()
     end
-
-    if BotControl_Action_Summon then
-        BotControl_Action_Summon()
-    end
 end

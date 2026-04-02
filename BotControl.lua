@@ -1,6 +1,8 @@
 BotControl = {}
 BotControl_ProfileElements = {}
 BotControl_ActionElements = {}
+BotControl.selectedProfileName = nil
+BotControl_SelectedProfileName = nil
 
 BotControl.ACTION_BUTTON_CONFIG = {
     ComposeGroup = {
@@ -32,6 +34,24 @@ BotControl.ACTION_BUTTON_CONFIG = {
         texture = "Interface\\Icons\\Ability_Warrior_Charge",
         title = "Attaque du tank",
         description = "Ordonne au tank d'attaquer, les autres attendent"
+    }
+}
+
+BotControl.PROFILE_BUTTON_CONFIG = {
+    Save = {
+        texture = "Interface\\Icons\\INV_Misc_Note_01",
+        title = "Sauvegarder le profil",
+        description = "Enregistre le profil avec le nom saisi"
+    },
+    Load = {
+        texture = "Interface\\Icons\\Spell_Arcane_PortalIronForge",
+        title = "Charger le profil",
+        description = "Charge le profil selectionne"
+    },
+    Delete = {
+        texture = "Interface\\Icons\\INV_Misc_Bone_ElfSkull_01",
+        title = "Supprimer le profil",
+        description = "Supprime le profil selectionne"
     }
 }
 
@@ -177,6 +197,94 @@ function BotControl.AddElement(targetTable, element)
     table.insert(targetTable, element)
 end
 
+function BotControl.GetSortedProfileNames()
+    local db = BotControlConfig:GetDB()
+    local names = {}
+    local profileName
+
+    if type(db.profiles) ~= "table" then
+        return names
+    end
+
+    for profileName in pairs(db.profiles) do
+        table.insert(names, profileName)
+    end
+
+    table.sort(names)
+
+    return names
+end
+
+function BotControl.GetSelectedProfileName()
+    if BotControl.HasValue(BotControl.selectedProfileName) then
+        return BotControl.selectedProfileName
+    end
+
+    return BotControl.GetProfileName()
+end
+
+function BotControl.SelectProfile(profileName)
+    profileName = BotControl.Trim(profileName or "")
+    if not BotControl.HasValue(profileName) then
+        BotControl.selectedProfileName = nil
+        BotControl_SelectedProfileName = nil
+        if BotControlProfileNameEditBox then
+            BotControlProfileNameEditBox:SetText("")
+        end
+        return
+    end
+
+    BotControl.selectedProfileName = profileName
+    BotControl_SelectedProfileName = profileName
+
+    if BotControlProfileNameEditBox then
+        BotControlProfileNameEditBox:SetText(profileName)
+    end
+
+    BotControl.RefreshProfileList()
+end
+
+function BotControl.RefreshProfileList()
+    local names = BotControl.GetSortedProfileNames()
+    local selectedName = BotControl.selectedProfileName
+    local rowButtons = BotControl.profileListButtons
+    local row
+    local rowButton
+    local name
+
+    if not rowButtons then
+        return
+    end
+
+    if selectedName and not BotControlConfig:GetDB().profiles[selectedName] then
+        selectedName = nil
+        BotControl.selectedProfileName = nil
+        BotControl_SelectedProfileName = nil
+    end
+
+    for row = 1, table.getn(rowButtons) do
+        rowButton = rowButtons[row]
+        name = names[row]
+
+        if name then
+            rowButton.profileName = name
+            rowButton.text:SetText(name)
+            rowButton:Show()
+
+            if selectedName == name then
+                rowButton.text:SetTextColor(0.2, 1, 0.2, 1)
+            else
+                rowButton.text:SetTextColor(1, 1, 1, 1)
+            end
+        else
+            rowButton.profileName = nil
+            rowButton.text:SetText("")
+            rowButton.text:SetTextColor(1, 1, 1, 1)
+            rowButton:Hide()
+        end
+    end
+end
+
 function BotControl_SetActionButtonIcon(button, texturePath, title, description)
     if not button then
         return
@@ -237,6 +345,25 @@ function BotControl.StyleActionButtons()
     BotControl_SetActionButtonIcon(BotControlFrameTankAttackButton, config.texture, config.title, config.description)
 end
 
+function BotControl.StyleProfileControls()
+    local config
+
+    if BotControlProfileNameEditBox then
+        BotControlProfileNameEditBox:SetBackdropColor(0, 0, 0, 0.92)
+        BotControlProfileNameEditBox:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+        BotControlProfileNameEditBox:SetTextColor(1, 1, 1, 1)
+    end
+
+    config = BotControl.PROFILE_BUTTON_CONFIG.Save
+    BotControl_SetActionButtonIcon(BotControlSaveProfileButton, config.texture, config.title, config.description)
+
+    config = BotControl.PROFILE_BUTTON_CONFIG.Load
+    BotControl_SetActionButtonIcon(BotControlLoadProfileButton, config.texture, config.title, config.description)
+
+    config = BotControl.PROFILE_BUTTON_CONFIG.Delete
+    BotControl_SetActionButtonIcon(BotControlDeleteProfileButton, config.texture, config.title, config.description)
+end
+
 function BotControl.RegisterTabElements(frame)
     local index
     local field
@@ -247,11 +374,19 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameNamesHeader)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameBuildsHeader)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameProfileNameLabel)
+    BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesListLabel)
+    BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesListFrame)
     BotControl.AddElement(BotControl_ProfileElements, BotControlProfileNameEditBox)
     BotControl.AddElement(BotControl_ProfileElements, BotControlSaveProfileButton)
     BotControl.AddElement(BotControl_ProfileElements, BotControlLoadProfileButton)
     BotControl.AddElement(BotControl_ProfileElements, BotControlDeleteProfileButton)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameSaveButton)
+
+    if BotControl.profileListButtons then
+        for index = 1, table.getn(BotControl.profileListButtons) do
+            BotControl.AddElement(BotControl_ProfileElements, BotControl.profileListButtons[index])
+        end
+    end
 
     if frame and frame.fields then
         for index = 1, table.getn(frame.fields) do
@@ -305,6 +440,8 @@ function BotControl_ShowTab(tabName)
                 element:Hide()
             end
         end
+
+        BotControl.RefreshProfileList()
     end
 
     print("BotControl: switched to " .. tabName)
@@ -318,6 +455,7 @@ function BotControl.InitializeFrame(frame)
     BotControl.BuildFields(frame)
     BotControl.CreateButtons(frame)
     BotControl.StyleActionButtons()
+    BotControl.StyleProfileControls()
     BotControl.RegisterTabElements(frame)
     BotControl.RegisterSpecialFrame("BotControlFrame")
     frame.isInitialized = true
@@ -328,8 +466,12 @@ function BotControl.CreateButtons(frame)
     local saveProfileButton
     local loadProfileButton
     local deleteProfileButton
+    local profileListLabel
+    local profileListFrame
+    local profileListButton
     local profilesTabButton
     local actionsTabButton
+    local index
 
     if not frame then
         return
@@ -381,7 +523,7 @@ function BotControl.CreateButtons(frame)
         loadProfileButton:SetWidth(110)
         loadProfileButton:SetHeight(24)
         loadProfileButton:SetScript("OnClick", function()
-            BotControl_LoadProfile(BotControl.GetProfileName())
+            BotControl_LoadProfile(BotControl.GetSelectedProfileName())
         end)
     end
 
@@ -391,8 +533,56 @@ function BotControl.CreateButtons(frame)
         deleteProfileButton:SetWidth(110)
         deleteProfileButton:SetHeight(24)
         deleteProfileButton:SetScript("OnClick", function()
-            BotControl_DeleteProfile(BotControl.GetProfileName())
+            BotControl_DeleteProfile(BotControl.GetSelectedProfileName())
         end)
+    end
+
+    if not BotControlProfilesListLabel then
+        profileListLabel = frame:CreateFontString("BotControlProfilesListLabel", "OVERLAY", "GameFontNormal")
+        profileListLabel:SetJustifyH("LEFT")
+        profileListLabel:SetText("Profils enregistres")
+    end
+
+    if not BotControlProfilesListFrame then
+        profileListFrame = CreateFrame("Frame", "BotControlProfilesListFrame", frame)
+        profileListFrame:SetWidth(140)
+        profileListFrame:SetHeight(180)
+        profileListFrame:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true,
+            tileSize = 16,
+            edgeSize = 12,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 }
+        })
+        profileListFrame:SetBackdropColor(0, 0, 0, 0.5)
+        profileListFrame:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+    end
+
+    if not BotControl.profileListButtons then
+        BotControl.profileListButtons = {}
+
+        for index = 1, 8 do
+            profileListButton = CreateFrame("Button", nil, BotControlProfilesListFrame)
+            profileListButton:SetWidth(122)
+            profileListButton:SetHeight(16)
+            profileListButton.text = profileListButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            profileListButton.text:SetPoint("LEFT", profileListButton, "LEFT", 2, 0)
+            profileListButton.text:SetPoint("RIGHT", profileListButton, "RIGHT", -2, 0)
+            profileListButton.text:SetJustifyH("LEFT")
+            profileListButton.text:SetText("")
+            profileListButton:SetScript("OnClick", function(self)
+                BotControl.SelectProfile(self.profileName)
+            end)
+
+            if index == 1 then
+                profileListButton:SetPoint("TOPLEFT", BotControlProfilesListFrame, "TOPLEFT", 8, -8)
+            else
+                profileListButton:SetPoint("TOPLEFT", BotControl.profileListButtons[index - 1], "BOTTOMLEFT", 0, -4)
+            end
+
+            BotControl.profileListButtons[index] = profileListButton
+        end
     end
 end
 
@@ -550,6 +740,8 @@ function BotControl_SaveProfile(profileName)
 
     db.profiles[profileName] = BotControl.BuildProfileFromValues(values)
     BotControl.SyncGroupsToDB(values)
+    BotControl.selectedProfileName = profileName
+    BotControl.RefreshProfileList()
     print("BotControl: profile saved -> " .. profileName)
 end
 
@@ -584,6 +776,8 @@ function BotControl_LoadProfile(profileName)
 
     BotControl.SyncGroupsToDB(values)
     BotControl.ApplyValuesToUI(frame, values)
+    BotControl.selectedProfileName = profileName
+    BotControl.RefreshProfileList()
     print("BotControl: profile loaded -> " .. profileName)
 end
 
@@ -606,6 +800,10 @@ function BotControl_DeleteProfile(profileName)
     end
 
     db.profiles[profileName] = nil
+    if BotControl.selectedProfileName == profileName then
+        BotControl.selectedProfileName = nil
+    end
+    BotControl.RefreshProfileList()
     print("BotControl: profile deleted -> " .. profileName)
 end
 
@@ -616,6 +814,8 @@ function BotControl_LayoutButtons()
     local namesHeader = BotControlFrameNamesHeader
     local buildsHeader = BotControlFrameBuildsHeader
     local profileNameLabel = BotControlFrameProfileNameLabel
+    local profilesListLabel = BotControlProfilesListLabel
+    local profilesListFrame = BotControlProfilesListFrame
     local profileNameEditBox = BotControlProfileNameEditBox
     local saveProfileButton = BotControlSaveProfileButton
     local loadProfileButton = BotControlLoadProfileButton
@@ -656,44 +856,64 @@ function BotControl_LayoutButtons()
         buildsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 222, -58)
     end
 
+    if profilesListLabel then
+        profilesListLabel:ClearAllPoints()
+        profilesListLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 398, -58)
+    end
+
+    if profilesListFrame then
+        profilesListFrame:ClearAllPoints()
+        profilesListFrame:SetWidth(138)
+        profilesListFrame:SetHeight(160)
+        profilesListFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 394, -76)
+    end
+
     if profileNameLabel then
         profileNameLabel:ClearAllPoints()
-        profileNameLabel:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 60)
+        if profilesListFrame then
+            profileNameLabel:SetPoint("TOPLEFT", profilesListFrame, "BOTTOMLEFT", 0, -14)
+        else
+            profileNameLabel:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 394, 84)
+        end
     end
 
     if profileNameEditBox then
         profileNameEditBox:ClearAllPoints()
-        profileNameEditBox:SetWidth(150)
-        profileNameEditBox:SetHeight(20)
-        profileNameEditBox:SetPoint("LEFT", profileNameLabel, "RIGHT", 12, 0)
+        profileNameEditBox:SetWidth(138)
+        profileNameEditBox:SetHeight(22)
+        profileNameEditBox:SetPoint("TOPLEFT", profileNameLabel, "BOTTOMLEFT", 0, -6)
     end
 
     if saveProfileButton then
         saveProfileButton:ClearAllPoints()
-        saveProfileButton:SetWidth(96)
-        saveProfileButton:SetHeight(24)
-        saveProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 20)
+        saveProfileButton:SetWidth(36)
+        saveProfileButton:SetHeight(36)
+        if profileNameEditBox then
+            saveProfileButton:SetPoint("TOPLEFT", profileNameEditBox, "BOTTOMLEFT", 0, -10)
+        else
+            saveProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 394, 20)
+        end
     end
 
     if loadProfileButton then
         loadProfileButton:ClearAllPoints()
-        loadProfileButton:SetWidth(96)
-        loadProfileButton:SetHeight(24)
+        loadProfileButton:SetWidth(36)
+        loadProfileButton:SetHeight(36)
         if saveProfileButton then
             loadProfileButton:SetPoint("LEFT", saveProfileButton, "RIGHT", 8, 0)
         else
-            loadProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 128, 20)
+            loadProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 466, 20)
         end
     end
 
     if deleteProfileButton then
         deleteProfileButton:ClearAllPoints()
-        deleteProfileButton:SetWidth(96)
-        deleteProfileButton:SetHeight(24)
+        deleteProfileButton:SetWidth(36)
+        deleteProfileButton:SetHeight(36)
         if loadProfileButton then
             deleteProfileButton:SetPoint("LEFT", loadProfileButton, "RIGHT", 8, 0)
-        else
-            deleteProfileButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 232, 20)
+        elseif saveProfileButton then
+            deleteProfileButton:SetPoint("LEFT", saveProfileButton, "RIGHT", 8, 0)
         end
     end
 
@@ -864,7 +1084,13 @@ function BotControl.HandleEvent()
         BotControl.InitializeFrame(BotControlFrame)
         BotControl_LayoutButtons()
         BotControl.Load()
+        BotControl.RefreshProfileList()
     end
+end
+
+function BotControl.OnFrameShow()
+    BotControl_LayoutButtons()
+    BotControl.RefreshProfileList()
 end
 
 function BotControl_OnLoad(frame)
@@ -874,7 +1100,8 @@ function BotControl_OnLoad(frame)
     end
     BotControl.InitializeFrame(frame)
     BotControl_LayoutButtons()
-    frame:SetScript("OnShow", BotControl_LayoutButtons)
+    BotControl.RefreshProfileList()
+    frame:SetScript("OnShow", BotControl.OnFrameShow)
     BotControl_ShowTab("Profiles")
     eventFrame:RegisterEvent("ADDON_LOADED")
     eventFrame:RegisterEvent("PLAYER_LOGIN")

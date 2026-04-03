@@ -108,11 +108,71 @@ BotControl.FIELD_DEFINITIONS = {
     { key = "dps1Name", label = "DPS 1", column = "left", order = 3 },
     { key = "dps2Name", label = "DPS 2", column = "left", order = 4 },
     { key = "dps3Name", label = "DPS 3", column = "left", order = 5 },
-    { key = "tankBuild", label = "Tank spec", column = "right", order = 1 },
-    { key = "healBuild", label = "Heal spec", column = "right", order = 2 },
-    { key = "dps1Build", label = "DPS 1 spec", column = "right", order = 3 },
-    { key = "dps2Build", label = "DPS 2 spec", column = "right", order = 4 },
-    { key = "dps3Build", label = "DPS 3 spec", column = "right", order = 5 }
+    { key = "tankBuild", classKey = "tankClass", label = "Tank spec", column = "right", order = 1, control = "classSpec" },
+    { key = "healBuild", classKey = "healClass", label = "Heal spec", column = "right", order = 2, control = "classSpec" },
+    { key = "dps1Build", classKey = "dps1Class", label = "DPS 1 spec", column = "right", order = 3, control = "classSpec" },
+    { key = "dps2Build", classKey = "dps2Class", label = "DPS 2 spec", column = "right", order = 4, control = "classSpec" },
+    { key = "dps3Build", classKey = "dps3Class", label = "DPS 3 spec", column = "right", order = 5, control = "classSpec" }
+}
+
+BotControl.Classes = {
+    "Paladin",
+    "Guerrier",
+    "Chasseur",
+    "Voleur",
+    "Prêtre",
+    "Mage",
+    "Démoniste",
+    "Chaman",
+    "Druide",
+}
+
+BotControl.ClassSpecs = {
+    ["Paladin"] = {
+        "pve prot",
+        "pve holy",
+        "pve dps ret",
+    },
+    ["Guerrier"] = {
+        "pve prot",
+        "pve arms",
+        "pve fury",
+    },
+    ["Chasseur"] = {
+        "pve dps mm",
+        "pve dps bm",
+        "pve survival",
+    },
+    ["Voleur"] = {
+        "pve assassination",
+        "pve assassination v2",
+        "pve dps combat",
+    },
+    ["Prêtre"] = {
+        "pve heal disc",
+        "pve heal holy",
+        "pve dps shadow",
+    },
+    ["Mage"] = {
+        "pve dps arcane",
+        "pve dps fire",
+        "pve dps frost",
+    },
+    ["Démoniste"] = {
+        "pve dps destro",
+        "pve dps affli",
+    },
+    ["Chaman"] = {
+        "pve resto",
+        "pve dps elem",
+        "pve dps enh",
+    },
+    ["Druide"] = {
+        "pve dps feral tank",
+        "pve resto",
+        "pve dps balance",
+        "pve dps feral cat",
+    },
 }
 
 local eventFrame = CreateFrame("Frame", "BotControlEventFrame")
@@ -132,6 +192,167 @@ end
 
 function BotControl.HasValue(value)
     return value ~= nil and value ~= ""
+end
+
+function BotControl.CopyList(source)
+    local copy = {}
+    local index
+
+    if type(source) ~= "table" then
+        return copy
+    end
+
+    for index = 1, table.getn(source) do
+        table.insert(copy, source[index])
+    end
+
+    return copy
+end
+
+function BotControl.GetSpecsForClass(className)
+    local specs = BotControl.ClassSpecs[className]
+
+    if type(specs) ~= "table" then
+        return {}
+    end
+
+    return BotControl.CopyList(specs)
+end
+
+function BotControl.IsSpecValidForClass(className, specName)
+    local specs
+    local index
+
+    className = BotControl.Trim(className or "")
+    specName = BotControl.Trim(specName or "")
+    if not BotControl.HasValue(className) or not BotControl.HasValue(specName) then
+        return false
+    end
+
+    specs = BotControl.ClassSpecs[className]
+    if type(specs) ~= "table" then
+        return false
+    end
+
+    for index = 1, table.getn(specs) do
+        if specs[index] == specName then
+            return true
+        end
+    end
+
+    return false
+end
+
+function BotControl.GetClassForSpec(specName)
+    local className
+    local specs
+    local index
+    local foundClass
+
+    specName = BotControl.Trim(specName or "")
+    if not BotControl.HasValue(specName) then
+        return ""
+    end
+
+    for className, specs in pairs(BotControl.ClassSpecs) do
+        if type(specs) == "table" then
+            for index = 1, table.getn(specs) do
+                if specs[index] == specName then
+                    if foundClass and foundClass ~= className then
+                        return ""
+                    end
+
+                    foundClass = className
+                end
+            end
+        end
+    end
+
+    return foundClass or ""
+end
+
+function BotControl.ExtractBuildSelection(buildData, fallbackClass)
+    local className = ""
+    local specName = ""
+
+    if type(buildData) == "table" then
+        className = BotControl.Trim(buildData.class or "")
+        specName = BotControl.Trim(buildData.spec or buildData.build or "")
+    elseif type(buildData) == "string" then
+        specName = BotControl.Trim(buildData)
+    end
+
+    if not BotControl.HasValue(className) then
+        className = BotControl.Trim(fallbackClass or "")
+    end
+
+    if not BotControl.HasValue(className) and BotControl.HasValue(specName) then
+        className = BotControl.GetClassForSpec(specName)
+    end
+
+    return className, specName
+end
+
+function BotControl.CreateProfileBuildEntry(className, specName)
+    return {
+        class = BotControl.Trim(className or ""),
+        spec = BotControl.Trim(specName or "")
+    }
+end
+
+function BotControl.UpdateDropdownValue(dropdown, value, emptyText)
+    value = BotControl.Trim(value or "")
+    dropdown.selectedValue = value
+
+    if BotControl.HasValue(value) then
+        UIDropDownMenu_SetSelectedValue(dropdown, value)
+        UIDropDownMenu_SetText(value, dropdown)
+    else
+        UIDropDownMenu_SetText(emptyText or "", dropdown)
+    end
+end
+
+function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onSelect)
+    local menuFrame = dropdown
+
+    dropdown.items = items or {}
+    dropdown.emptyText = emptyText or ""
+    dropdown.onSelect = onSelect
+
+    UIDropDownMenu_Initialize(dropdown, function(level)
+        local index
+        local optionValue
+        local optionText
+        local info
+
+        if level and level ~= 1 then
+            return
+        end
+
+        for index = 1, table.getn(menuFrame.items) do
+            optionValue = menuFrame.items[index]
+            optionText = optionValue
+            if optionText == "" then
+                optionText = "-"
+            end
+            info = UIDropDownMenu_CreateInfo()
+            info.text = optionText
+            info.value = optionValue
+            do
+                local selectedOption = optionValue
+                info.func = function()
+                    BotControl.UpdateDropdownValue(menuFrame, selectedOption, menuFrame.emptyText)
+
+                    if menuFrame.onSelect then
+                        menuFrame.onSelect(selectedOption)
+                    end
+                end
+            end
+            UIDropDownMenu_AddButton(info, 1)
+        end
+    end)
+
+    BotControl.UpdateDropdownValue(dropdown, selectedValue, emptyText)
 end
 
 function BotControl.Print(message)
@@ -171,7 +392,7 @@ function BotControl.RegisterSpecialFrame(frameName)
     table.insert(UISpecialFrames, frameName)
 end
 
-function BotControl.CreateField(parent, definition)
+function BotControl.CreateTextField(parent, definition)
     local rowY = -78 - ((definition.order - 1) * 40)
     local labelX
     local boxX
@@ -222,8 +443,121 @@ function BotControl.CreateField(parent, definition)
     return {
         key = definition.key,
         label = label,
-        editBox = editBox
+        editBox = editBox,
+        CollectValues = function(self, values)
+            values[self.key] = BotControl.Trim(self.editBox:GetText() or "")
+        end,
+        ApplyValues = function(self, values)
+            self.editBox:SetText(values[self.key] or "")
+        end
     }
+end
+
+function BotControl.CreateClassSpecField(parent, definition)
+    local rowY = -78 - ((definition.order - 1) * 40)
+    local classDropdown
+    local specDropdown
+    local field
+    local classItems = BotControl.CopyList(BotControl.Classes)
+    local classDropdownX = 166
+    local classDropdownWidth = 64
+    local dropdownSpacing = -18
+    local specDropdownWidth = 78
+
+    table.insert(classItems, 1, "")
+
+    classDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "ClassDropDown", parent, "UIDropDownMenuTemplate")
+    classDropdown:ClearAllPoints()
+    classDropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", classDropdownX, rowY - 8)
+    UIDropDownMenu_SetWidth(classDropdownWidth, classDropdown)
+    UIDropDownMenu_JustifyText("LEFT", classDropdown)
+
+    specDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "SpecDropDown", parent, "UIDropDownMenuTemplate")
+    specDropdown:ClearAllPoints()
+    specDropdown:SetPoint("LEFT", classDropdown, "RIGHT", dropdownSpacing, 0)
+    UIDropDownMenu_SetWidth(specDropdownWidth, specDropdown)
+    UIDropDownMenu_JustifyText("LEFT", specDropdown)
+
+    field = {
+        key = definition.key,
+        classKey = definition.classKey,
+        classDropdown = classDropdown,
+        specDropdown = specDropdown,
+        classItems = classItems,
+        currentClass = "",
+        currentSpec = ""
+    }
+
+    field.RefreshSpecDropdown = function(self, preserveLegacySpec)
+        local specItems = {}
+
+        if BotControl.HasValue(self.currentClass) then
+            specItems = BotControl.GetSpecsForClass(self.currentClass)
+            if not BotControl.IsSpecValidForClass(self.currentClass, self.currentSpec) then
+                if table.getn(specItems) > 0 then
+                    self.currentSpec = specItems[1]
+                else
+                    self.currentSpec = ""
+                end
+            end
+        elseif preserveLegacySpec and BotControl.HasValue(self.currentSpec) then
+            table.insert(specItems, self.currentSpec)
+        else
+            self.currentSpec = ""
+        end
+
+        BotControl.SetupDropdown(self.specDropdown, specItems, self.currentSpec, "Spe", function(selectedSpec)
+            self.currentSpec = BotControl.Trim(selectedSpec or "")
+        end)
+    end
+
+    field.SetSelection = function(self, className, specName, preserveLegacySpec)
+        self.currentClass = BotControl.Trim(className or "")
+        self.currentSpec = BotControl.Trim(specName or "")
+
+        BotControl.SetupDropdown(self.classDropdown, self.classItems, self.currentClass, "Classe", function(selectedClass)
+            local specs
+
+            self.currentClass = BotControl.Trim(selectedClass or "")
+            if BotControl.HasValue(self.currentClass) then
+                if not BotControl.IsSpecValidForClass(self.currentClass, self.currentSpec) then
+                    specs = BotControl.GetSpecsForClass(self.currentClass)
+                    if table.getn(specs) > 0 then
+                        self.currentSpec = specs[1]
+                    else
+                        self.currentSpec = ""
+                    end
+                end
+            else
+                self.currentSpec = ""
+            end
+
+            self:RefreshSpecDropdown(false)
+        end)
+
+        self:RefreshSpecDropdown(preserveLegacySpec)
+    end
+
+    field.CollectValues = function(self, values)
+        values[self.classKey] = BotControl.Trim(self.currentClass or "")
+        values[self.key] = BotControl.Trim(self.currentSpec or "")
+    end
+
+    field.ApplyValues = function(self, values)
+        self:SetSelection(values[self.classKey], values[self.key], true)
+    end
+
+    field:SetSelection("", "", false)
+
+    return field
+end
+
+function BotControl.CreateField(parent, definition)
+    if definition.control == "classSpec" then
+        return BotControl.CreateClassSpecField(parent, definition)
+    end
+
+    return BotControl.CreateTextField(parent, definition)
 end
 
 function BotControl.BuildFields(frame)
@@ -608,7 +942,15 @@ function BotControl.RegisterTabElements(frame)
             field = frame.fields[index]
             if field then
                 BotControl.AddElement(BotControl_ProfileElements, field.label)
-                BotControl.AddElement(BotControl_ProfileElements, field.editBox)
+                if field.editBox then
+                    BotControl.AddElement(BotControl_ProfileElements, field.editBox)
+                end
+                if field.classDropdown then
+                    BotControl.AddElement(BotControl_ProfileElements, field.classDropdown)
+                end
+                if field.specDropdown then
+                    BotControl.AddElement(BotControl_ProfileElements, field.specDropdown)
+                end
             end
         end
     end
@@ -992,7 +1334,11 @@ function BotControl.GetFieldValuesFromUI(frame)
 
     for index = 1, table.getn(frame.fields) do
         field = frame.fields[index]
-        values[field.key] = BotControl.Trim(field.editBox:GetText() or "")
+        if field and field.CollectValues then
+            field:CollectValues(values)
+        elseif field and field.editBox then
+            values[field.key] = BotControl.Trim(field.editBox:GetText() or "")
+        end
     end
 
     return values
@@ -1009,8 +1355,12 @@ function BotControl.ApplyValuesToUI(frame, values)
 
     for index = 1, table.getn(frame.fields) do
         field = frame.fields[index]
-        text = values[field.key] or ""
-        field.editBox:SetText(text)
+        if field and field.ApplyValues then
+            field:ApplyValues(values)
+        elseif field and field.editBox then
+            text = values[field.key] or ""
+            field.editBox:SetText(text)
+        end
     end
 end
 
@@ -1052,17 +1402,19 @@ function BotControl.BuildProfileFromValues(values)
             dps3 = values.dps3Name or ""
         },
         builds = {
-            tank = values.tankBuild or "",
-            heal = values.healBuild or "",
-            dps1 = values.dps1Build or "",
-            dps2 = values.dps2Build or "",
-            dps3 = values.dps3Build or ""
+            tank = BotControl.CreateProfileBuildEntry(values.tankClass, values.tankBuild),
+            heal = BotControl.CreateProfileBuildEntry(values.healClass, values.healBuild),
+            dps1 = BotControl.CreateProfileBuildEntry(values.dps1Class, values.dps1Build),
+            dps2 = BotControl.CreateProfileBuildEntry(values.dps2Class, values.dps2Build),
+            dps3 = BotControl.CreateProfileBuildEntry(values.dps3Class, values.dps3Build)
         }
     }
 end
 
 function BotControl.BuildValuesFromProfile(profile)
     local values = {}
+    local className
+    local specName
 
     if type(profile) ~= "table" then
         return values
@@ -1080,11 +1432,26 @@ function BotControl.BuildValuesFromProfile(profile)
     values.dps1Name = profile.bots.dps1 or ""
     values.dps2Name = profile.bots.dps2 or ""
     values.dps3Name = profile.bots.dps3 or ""
-    values.tankBuild = profile.builds.tank or ""
-    values.healBuild = profile.builds.heal or ""
-    values.dps1Build = profile.builds.dps1 or ""
-    values.dps2Build = profile.builds.dps2 or ""
-    values.dps3Build = profile.builds.dps3 or ""
+
+    className, specName = BotControl.ExtractBuildSelection(profile.builds.tank, profile.classes and profile.classes.tank)
+    values.tankClass = className
+    values.tankBuild = specName
+
+    className, specName = BotControl.ExtractBuildSelection(profile.builds.heal, profile.classes and profile.classes.heal)
+    values.healClass = className
+    values.healBuild = specName
+
+    className, specName = BotControl.ExtractBuildSelection(profile.builds.dps1, profile.classes and profile.classes.dps1)
+    values.dps1Class = className
+    values.dps1Build = specName
+
+    className, specName = BotControl.ExtractBuildSelection(profile.builds.dps2, profile.classes and profile.classes.dps2)
+    values.dps2Class = className
+    values.dps2Build = specName
+
+    className, specName = BotControl.ExtractBuildSelection(profile.builds.dps3, profile.classes and profile.classes.dps3)
+    values.dps3Class = className
+    values.dps3Build = specName
 
     return values
 end
@@ -1112,6 +1479,11 @@ function BotControl_SaveProfile(profileName)
             dps1Name = BotControlConfig:GetValue("dps1Name"),
             dps2Name = BotControlConfig:GetValue("dps2Name"),
             dps3Name = BotControlConfig:GetValue("dps3Name"),
+            tankClass = BotControlConfig:GetValue("tankClass"),
+            healClass = BotControlConfig:GetValue("healClass"),
+            dps1Class = BotControlConfig:GetValue("dps1Class"),
+            dps2Class = BotControlConfig:GetValue("dps2Class"),
+            dps3Class = BotControlConfig:GetValue("dps3Class"),
             tankBuild = BotControlConfig:GetValue("tankBuild"),
             healBuild = BotControlConfig:GetValue("healBuild"),
             dps1Build = BotControlConfig:GetValue("dps1Build"),
@@ -1269,7 +1641,8 @@ function BotControl_LayoutButtons()
 
     if buildsHeader then
         buildsHeader:ClearAllPoints()
-        buildsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 222, -58)
+        buildsHeader:SetText("")
+        buildsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 190, -58)
     end
 
     if profilesListLabel then

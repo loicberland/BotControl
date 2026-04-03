@@ -6,6 +6,11 @@ BotControlConfig.defaults = {
     dps1Name = "",
     dps2Name = "",
     dps3Name = "",
+    tankClass = "",
+    healClass = "",
+    dps1Class = "",
+    dps2Class = "",
+    dps3Class = "",
     tankBuild = "",
     healBuild = "",
     dps1Build = "",
@@ -67,6 +72,7 @@ function BotControlConfig:SetValue(key, value)
 end
 
 function BotControlConfig:LoadToUI(frame)
+    local db
     local fields
     local index
     local field
@@ -75,11 +81,16 @@ function BotControlConfig:LoadToUI(frame)
         return
     end
 
+    db = self:GetDB()
     fields = frame.fields
 
     for index = 1, table.getn(fields) do
         field = fields[index]
-        field.editBox:SetText(self:GetValue(field.key))
+        if field and field.ApplyValues then
+            field:ApplyValues(db)
+        elseif field and field.editBox then
+            field.editBox:SetText(self:GetValue(field.key))
+        end
     end
 end
 
@@ -87,6 +98,8 @@ function BotControlConfig:SaveFromUI(frame)
     local fields
     local index
     local field
+    local values = {}
+    local key
     local text
 
     if not frame or not frame.fields then
@@ -97,7 +110,15 @@ function BotControlConfig:SaveFromUI(frame)
 
     for index = 1, table.getn(fields) do
         field = fields[index]
-        text = field.editBox:GetText() or ""
-        self:SetValue(field.key, BotControl.Trim(text))
+        if field and field.CollectValues then
+            field:CollectValues(values)
+        elseif field and field.editBox then
+            text = field.editBox:GetText() or ""
+            values[field.key] = BotControl.Trim(text)
+        end
+    end
+
+    for key, text in pairs(values) do
+        self:SetValue(key, text)
     end
 end

@@ -1,0 +1,131 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <Frame name="BotControlFrame" parent="UIParent" hidden="true" movable="true" enableMouse="true" frameStrata="DIALOG" toplevel="true">
+        <Size>
+            <AbsDimension x="560" y="350"/>
+        </Size>
+        <Anchors>
+            <Anchor point="CENTER"/>
+        </Anchors>
+        <Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\DialogFrame\UI-DialogBox-Border" tile="true">
+            <BackgroundInsets>
+                <AbsInset left="4" right="4" top="4" bottom="4"/>
+            </BackgroundInsets>
+            <TileSize>
+                <AbsValue val="16"/>
+            </TileSize>
+            <EdgeSize>
+                <AbsValue val="16"/>
+            </EdgeSize>
+        </Backdrop>
+        <Color r="0.05" g="0.05" b="0.05" a="0.92"/>
+        <Layers>
+            <Layer level="OVERLAY">
+                <FontString name="$parentTitle" inherits="GameFontNormalLarge">
+                    <Anchors>
+                        <Anchor point="TOP" x="0" y="-14"/>
+                    </Anchors>
+                    <Text>BotControl</Text>
+                </FontString>
+                <FontString name="$parentNamesHeader" inherits="GameFontNormal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="26" y="-44"/>
+                    </Anchors>
+                    <Text>Bot names</Text>
+                </FontString>
+                <FontString name="$parentBuildsHeader" inherits="GameFontNormal">
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="276" y="-44"/>
+                    </Anchors>
+                    <Text>Builds</Text>
+                </FontString>
+                <FontString name="$parentProfileNameLabel" inherits="GameFontNormal">
+                    <Text>Profile name</Text>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <Button name="$parentCloseButton" inherits="UIPanelCloseButton">
+                <Anchors>
+                    <Anchor point="TOPRIGHT" x="-6" y="-6"/>
+                </Anchors>
+            </Button>
+
+            <Button name="$parentSaveButton" inherits="UIPanelButtonTemplate" text="Save">
+                <Scripts>
+                    <OnClick>BotControl_SaveButton_OnClick();</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="$parentComposeGroupButton" inherits="UIPanelButtonTemplate" text="Compose group">
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("ComposeGroup");</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="$parentBuildButton" inherits="UIPanelButtonTemplate" text="Build">
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("Build");</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="$parentInitButton" inherits="UIPanelButtonTemplate" text="Init">
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("Init");</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="$parentSummonButton" inherits="UIPanelButtonTemplate" text="Summon">
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("Summon");</OnClick>
+                </Scripts>
+            </Button>
+
+            <Button name="$parentTankAttackButton" inherits="UIPanelButtonTemplate" text="Tank attack">
+                <Scripts>
+                    <OnClick>BotControl_RunNamedAction("TankAttack");</OnClick>
+                </Scripts>
+            </Button>
+
+            <EditBox name="BotControlProfileNameEditBox" virtual="false">
+                <Size>
+                    <AbsDimension x="150" y="20"/>
+                </Size>
+                <Backdrop bgFile="Interface\Tooltips\UI-Tooltip-Background" edgeFile="Interface\Tooltips\UI-Tooltip-Border" tile="true">
+                    <BackgroundInsets>
+                        <AbsInset left="3" right="3" top="3" bottom="3"/>
+                    </BackgroundInsets>
+                    <TileSize>
+                        <AbsValue val="16"/>
+                    </TileSize>
+                    <EdgeSize>
+                        <AbsValue val="12"/>
+                    </EdgeSize>
+                </Backdrop>
+                <BackdropColor r="0" g="0" b="0" a="0.8"/>
+                <BackdropBorderColor r="0.4" g="0.4" b="0.4" a="1"/>
+                <FontString inherits="GameFontHighlightSmall"/>
+                <Insets>
+                    <AbsInset left="6" right="6" top="2" bottom="2"/>
+                </Insets>
+                <MaxLetters>64</MaxLetters>
+                <Scripts>
+                    <OnLoad>
+                        self:SetAutoFocus(false);
+                        self:SetJustifyH("LEFT");
+                    </OnLoad>
+                    <OnEscapePressed>self:ClearFocus();</OnEscapePressed>
+                    <OnEnterPressed>self:ClearFocus();</OnEnterPressed>
+                </Scripts>
+            </EditBox>
+        </Frames>
+        <Scripts>
+            <OnLoad>BotControl_OnLoad(self);</OnLoad>
+            <OnMouseDown>
+                if button == "LeftButton" then
+                    self:StartMoving();
+                end
+            </OnMouseDown>
+            <OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+        </Scripts>
+    </Frame>
+</Ui>

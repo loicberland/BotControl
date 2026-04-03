@@ -1,0 +1,350 @@
+BotControlActions = {}
+
+BotControlActions.definitions = {
+    ComposeGroup = {
+        label = "Compose group",
+        builder = "ComposeGroupCommands"
+    },
+    Build = {
+        label = "Build",
+        builder = "BuildCommands"
+    },
+    Init = {
+        label = "Init",
+        builder = "InitCommands"
+    },
+    Summon = {
+        label = "Summon",
+        builder = "SummonCommands"
+    },
+    InitBots = {
+        label = "Init bots",
+        builder = "InitBotsCommands"
+    },
+    TankAttack = {
+        label = "Tank attack",
+        builder = "TankAttackCommands"
+    },
+    AttackDPS = {
+        label = "Attack DPS",
+        builder = "AttackDPSCommands"
+    },
+    Follow = {
+        label = "Follow",
+        builder = "FollowCommands"
+    },
+    Passive = {
+        label = "Passive",
+        builder = "PassiveCommands"
+    },
+    Stay = {
+        label = "Stay",
+        builder = "StayCommands"
+    },
+    Used = {
+        label = "Used",
+        builder = "UsedCommands"
+    }
+}
+
+local function AddCommand(commands, command)
+    if command and command ~= "" then
+        table.insert(commands, command)
+    end
+end
+
+local function AddWhisper(commands, target, message)
+    if BotControl.HasValue(target) and BotControl.HasValue(message) then
+        table.insert(commands, {
+            type = "WHISPER",
+            target = target,
+            message = message
+        })
+    end
+end
+
+local function AddParty(commands, message)
+    if BotControl.HasValue(message) then
+        table.insert(commands, {
+            type = "PARTY",
+            message = message
+        })
+    end
+end
+
+local function AddSlash(commands, command)
+    if BotControl.HasValue(command) then
+        table.insert(commands, {
+            type = "SLASH",
+            command = command
+        })
+    end
+end
+
+function BotControlActions:GetConfig()
+    return BotControlConfig:GetDB()
+end
+
+function BotControlActions:BuildCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisper(commands, cfg.tankName, "talents " .. cfg.tankBuild)
+    AddWhisper(commands, cfg.healName, "talents " .. cfg.healBuild)
+    AddWhisper(commands, cfg.dps1Name, "talents " .. cfg.dps1Build)
+    AddWhisper(commands, cfg.dps2Name, "talents " .. cfg.dps2Build)
+    AddWhisper(commands, cfg.dps3Name, "talents " .. cfg.dps3Build)
+
+    return commands
+end
+
+function BotControlActions:InitCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddParty(commands, "ll -equip,-quest,-skill,-disenchant,-use,-vendor,-trash")
+    AddParty(commands, "stance near")
+    AddParty(commands, "rti cc none")
+    AddParty(commands, "nc -loot")
+    AddParty(commands, "nc +passive")
+
+    AddWhisper(commands, cfg.tankName, "stance tank")
+    AddWhisper(commands, cfg.healName, "co +wait for attack")
+    AddWhisper(commands, cfg.dps1Name, "co +wait for attack")
+    AddWhisper(commands, cfg.dps2Name, "co +wait for attack")
+    AddWhisper(commands, cfg.dps3Name, "co +wait for attack")
+
+    return commands
+end
+
+function BotControlActions:SummonCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local names = {
+        cfg.tankName,
+        cfg.healName,
+        cfg.dps1Name,
+        cfg.dps2Name,
+        cfg.dps3Name
+    }
+    local index
+    local name
+
+    for index = 1, table.getn(names) do
+        name = names[index]
+        AddWhisper(commands, name, "summon")
+    end
+
+    return commands
+end
+
+function BotControlActions:TankAttackCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisper(commands, cfg.tankName, "attack")
+    AddWhisper(commands, cfg.healName, "wait for attack time 1")
+    AddWhisper(commands, cfg.dps1Name, "wait for attack time 10")
+    AddWhisper(commands, cfg.dps2Name, "wait for attack time 10")
+    AddWhisper(commands, cfg.dps3Name, "wait for attack time 10")
+
+    return commands
+end
+
+function BotControlActions:AttackDPSCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local dpsNames = {
+        cfg.dps1Name,
+        cfg.dps2Name,
+        cfg.dps3Name
+    }
+    local index
+    local name
+
+    for index = 1, table.getn(dpsNames) do
+        name = dpsNames[index]
+        AddWhisper(commands, name, "attack")
+    end
+
+    return commands
+end
+
+function BotControlActions:FollowCommands()
+    local commands = {}
+
+    AddParty(commands, "follow")
+    AddParty(commands, "co -passive")
+
+    return commands
+end
+
+function BotControlActions:PassiveCommands()
+    local commands = {}
+
+    AddParty(commands, "flee")
+
+    return commands
+end
+
+function BotControlActions:StayCommands()
+    local commands = {}
+
+    AddParty(commands, "stay")
+
+    return commands
+end
+
+function BotControlActions:UsedCommands()
+    local commands = {}
+
+    AddParty(commands, "u go")
+
+    return commands
+end
+
+function BotControlActions:InitBotsCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local names = {
+        cfg.tankName,
+        cfg.healName,
+        cfg.dps1Name,
+        cfg.dps2Name,
+        cfg.dps3Name
+    }
+    local index
+    local name
+
+    for index = 1, table.getn(names) do
+        name = names[index]
+        if BotControl.HasValue(name) then
+            AddSlash(commands, ".bot init " .. name)
+            AddSlash(commands, ".bot learn " .. name)
+            AddSlash(commands, ".bot gear " .. name)
+            AddSlash(commands, ".bot prepare " .. name)
+        end
+    end
+
+    return commands
+end
+
+function BotControlActions:ComposeGroupCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local names = {
+        cfg.tankName,
+        cfg.healName,
+        cfg.dps1Name,
+        cfg.dps2Name,
+        cfg.dps3Name
+    }
+    local index
+    local name
+
+    for index = 1, table.getn(names) do
+        name = names[index]
+        if BotControl.HasValue(name) then
+            AddSlash(commands, ".bot add " .. name)
+        end
+    end
+
+    for index = 1, table.getn(names) do
+        name = names[index]
+        AddWhisper(commands, name, "leave group")
+    end
+
+    for index = 1, table.getn(names) do
+        name = names[index]
+        if BotControl.HasValue(name) then
+            AddSlash(commands, "/invite " .. name)
+        end
+    end
+
+    return commands
+end
+
+function BotControlActions:RunAction(actionKey)
+    local definition
+    local commands
+
+    definition = self.definitions[actionKey]
+    if not definition or not self[definition.builder] then
+        BotControl.Print("Unknown action: " .. tostring(actionKey))
+        return
+    end
+
+    BotControl.Print("Running action: " .. definition.label)
+    commands = self[definition.builder](self)
+    BotControl.RunCommands(commands)
+end
+
+function BotControl_Action_Build()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Build")
+    end
+end
+
+function BotControl_Action_Init()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Init")
+    end
+end
+
+function BotControl_Action_Summon()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Summon")
+    end
+end
+
+function BotControl_Action_InitBots()
+    local commands
+
+    if BotControlActions and BotControlActions.InitBotsCommands and BotControl.RunCommandsQueued then
+        BotControl.Print("Running action: Init bots")
+        commands = BotControlActions:InitBotsCommands()
+        BotControl.RunCommandsQueued(commands)
+    end
+end
+
+function BotControl_Action_AttackDPS()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("AttackDPS")
+    end
+end
+
+function BotControl_Action_Follow()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Follow")
+    end
+end
+
+function BotControl_Action_Passive()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Passive")
+    end
+end
+
+function BotControl_Action_Stay()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Stay")
+    end
+end
+
+function BotControl_Action_Used()
+    if BotControlActions and BotControlActions.RunAction then
+        BotControlActions:RunAction("Used")
+    end
+end
+
+function BotControl_Action_FullSetup()
+    print("BotControl: Running Full Setup")
+
+    if BotControl_Action_Build then
+        BotControl_Action_Build()
+    end
+
+    if BotControl_Action_Init then
+        BotControl_Action_Init()
+    end
+end

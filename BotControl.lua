@@ -9,7 +9,7 @@ BotControl_SelectedProfileName = nil
 BotControl.currentTab = "Profiles"
 BotControl.currentActionsSubTab = "Config"
 
-BotControl.PROFILES_FRAME_WIDTH = 560
+BotControl.PROFILES_FRAME_WIDTH = 595
 BotControl.PROFILES_FRAME_HEIGHT = 350
 BotControl.ACTIONS_CONFIG_FRAME_WIDTH = 400
 BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 360
@@ -103,16 +103,22 @@ BotControl.PROFILE_BUTTON_CONFIG = {
 }
 
 BotControl.FIELD_DEFINITIONS = {
-    { key = "tankName", label = "Tank bot", column = "left", order = 1 },
-    { key = "healName", label = "Heal bot", column = "left", order = 2 },
-    { key = "dps1Name", label = "DPS 1", column = "left", order = 3 },
-    { key = "dps2Name", label = "DPS 2", column = "left", order = 4 },
-    { key = "dps3Name", label = "DPS 3", column = "left", order = 5 },
-    { key = "tankBuild", classKey = "tankClass", label = "Tank spec", column = "right", order = 1, control = "classSpec" },
-    { key = "healBuild", classKey = "healClass", label = "Heal spec", column = "right", order = 2, control = "classSpec" },
-    { key = "dps1Build", classKey = "dps1Class", label = "DPS 1 spec", column = "right", order = 3, control = "classSpec" },
-    { key = "dps2Build", classKey = "dps2Class", label = "DPS 2 spec", column = "right", order = 4, control = "classSpec" },
-    { key = "dps3Build", classKey = "dps3Class", label = "DPS 3 spec", column = "right", order = 5, control = "classSpec" }
+    { key = "tankName", label = "Bot 1", column = "left", order = 1 },
+    { key = "healName", label = "Bot 2", column = "left", order = 2 },
+    { key = "dps1Name", label = "Bot 3", column = "left", order = 3 },
+    { key = "dps2Name", label = "Bot 4", column = "left", order = 4 },
+    { key = "dps3Name", label = "Bot 5", column = "left", order = 5 },
+    { key = "tankBuild", roleKey = "tankRole", classKey = "tankClass", label = "", column = "right", order = 1, control = "classSpec" },
+    { key = "healBuild", roleKey = "healRole", classKey = "healClass", label = "", column = "right", order = 2, control = "classSpec" },
+    { key = "dps1Build", roleKey = "dps1Role", classKey = "dps1Class", label = "", column = "right", order = 3, control = "classSpec" },
+    { key = "dps2Build", roleKey = "dps2Role", classKey = "dps2Class", label = "", column = "right", order = 4, control = "classSpec" },
+    { key = "dps3Build", roleKey = "dps3Role", classKey = "dps3Class", label = "", column = "right", order = 5, control = "classSpec" }
+}
+
+BotControl.Roles = {
+    "tank",
+    "heal",
+    "dps",
 }
 
 BotControl.Classes = {
@@ -192,6 +198,38 @@ end
 
 function BotControl.HasValue(value)
     return value ~= nil and value ~= ""
+end
+
+function BotControl.GetDefaultRoleForField(key)
+    if key == "tankName" or key == "tankBuild" then
+        return "tank"
+    end
+
+    if key == "healName" or key == "healBuild" then
+        return "heal"
+    end
+
+    return "dps"
+end
+
+function BotControl.NormalizeRole(roleName, fallbackRole)
+    local index
+
+    roleName = BotControl.Trim(roleName or "")
+    for index = 1, table.getn(BotControl.Roles) do
+        if BotControl.Roles[index] == roleName then
+            return roleName
+        end
+    end
+
+    fallbackRole = BotControl.Trim(fallbackRole or "")
+    for index = 1, table.getn(BotControl.Roles) do
+        if BotControl.Roles[index] == fallbackRole then
+            return fallbackRole
+        end
+    end
+
+    return "dps"
 end
 
 function BotControl.CopyList(source)
@@ -298,6 +336,35 @@ function BotControl.CreateProfileBuildEntry(className, specName)
         class = BotControl.Trim(className or ""),
         spec = BotControl.Trim(specName or "")
     }
+end
+
+function BotControl.CreateProfileSlotEntry(name, roleName, className, specName, fallbackRole)
+    return {
+        name = BotControl.Trim(name or ""),
+        role = BotControl.NormalizeRole(roleName, fallbackRole),
+        class = BotControl.Trim(className or ""),
+        spec = BotControl.Trim(specName or "")
+    }
+end
+
+function BotControl.ExtractSlotSelection(slotData, fallbackName, fallbackRole, fallbackBuild)
+    local name = BotControl.Trim(fallbackName or "")
+    local roleName = BotControl.NormalizeRole(nil, fallbackRole)
+    local className
+    local specName
+
+    className, specName = BotControl.ExtractBuildSelection(fallbackBuild)
+
+    if type(slotData) == "table" then
+        if BotControl.HasValue(slotData.name) then
+            name = BotControl.Trim(slotData.name)
+        end
+
+        roleName = BotControl.NormalizeRole(slotData.role, roleName)
+        className, specName = BotControl.ExtractBuildSelection(slotData, className)
+    end
+
+    return name, roleName, className, specName
 end
 
 function BotControl.UpdateDropdownValue(dropdown, value, emptyText)
@@ -413,7 +480,11 @@ function BotControl.CreateTextField(parent, definition)
     label:SetText(definition.label)
 
     editBox = CreateFrame("EditBox", nil, parent)
-    editBox:SetWidth(150)
+    if definition.column == "left" then
+        editBox:SetWidth(140)
+    else
+        editBox:SetWidth(150)
+    end
     editBox:SetHeight(20)
     editBox:SetPoint("TOPLEFT", parent, "TOPLEFT", boxX, rowY - 14)
     editBox:SetAutoFocus(false)
@@ -455,20 +526,30 @@ end
 
 function BotControl.CreateClassSpecField(parent, definition)
     local rowY = -78 - ((definition.order - 1) * 40)
+    local roleDropdown
     local classDropdown
     local specDropdown
     local field
+    local roleItems = BotControl.CopyList(BotControl.Roles)
     local classItems = BotControl.CopyList(BotControl.Classes)
-    local classDropdownX = 166
-    local classDropdownWidth = 64
+    local roleDropdownX = 150
+    local roleDropdownWidth = 42
+    local classDropdownWidth = 56
+    local firstDropdownSpacing = -18
     local dropdownSpacing = -18
-    local specDropdownWidth = 78
+    local specDropdownWidth = 68
 
     table.insert(classItems, 1, "")
 
+    roleDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "RoleDropDown", parent, "UIDropDownMenuTemplate")
+    roleDropdown:ClearAllPoints()
+    roleDropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", roleDropdownX, rowY - 8)
+    UIDropDownMenu_SetWidth(roleDropdownWidth, roleDropdown)
+    UIDropDownMenu_JustifyText("LEFT", roleDropdown)
+
     classDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "ClassDropDown", parent, "UIDropDownMenuTemplate")
     classDropdown:ClearAllPoints()
-    classDropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", classDropdownX, rowY - 8)
+    classDropdown:SetPoint("LEFT", roleDropdown, "RIGHT", firstDropdownSpacing, 0)
     UIDropDownMenu_SetWidth(classDropdownWidth, classDropdown)
     UIDropDownMenu_JustifyText("LEFT", classDropdown)
 
@@ -480,10 +561,14 @@ function BotControl.CreateClassSpecField(parent, definition)
 
     field = {
         key = definition.key,
+        roleKey = definition.roleKey,
         classKey = definition.classKey,
+        roleDropdown = roleDropdown,
         classDropdown = classDropdown,
         specDropdown = specDropdown,
+        roleItems = roleItems,
         classItems = classItems,
+        currentRole = BotControl.GetDefaultRoleForField(definition.key),
         currentClass = "",
         currentSpec = ""
     }
@@ -511,9 +596,14 @@ function BotControl.CreateClassSpecField(parent, definition)
         end)
     end
 
-    field.SetSelection = function(self, className, specName, preserveLegacySpec)
+    field.SetSelection = function(self, roleName, className, specName, preserveLegacySpec)
+        self.currentRole = BotControl.NormalizeRole(roleName, BotControl.GetDefaultRoleForField(self.key))
         self.currentClass = BotControl.Trim(className or "")
         self.currentSpec = BotControl.Trim(specName or "")
+
+        BotControl.SetupDropdown(self.roleDropdown, self.roleItems, self.currentRole, "Role", function(selectedRole)
+            self.currentRole = BotControl.NormalizeRole(selectedRole, BotControl.GetDefaultRoleForField(self.key))
+        end)
 
         BotControl.SetupDropdown(self.classDropdown, self.classItems, self.currentClass, "Classe", function(selectedClass)
             local specs
@@ -539,15 +629,16 @@ function BotControl.CreateClassSpecField(parent, definition)
     end
 
     field.CollectValues = function(self, values)
+        values[self.roleKey] = BotControl.NormalizeRole(self.currentRole, BotControl.GetDefaultRoleForField(self.key))
         values[self.classKey] = BotControl.Trim(self.currentClass or "")
         values[self.key] = BotControl.Trim(self.currentSpec or "")
     end
 
     field.ApplyValues = function(self, values)
-        self:SetSelection(values[self.classKey], values[self.key], true)
+        self:SetSelection(values[self.roleKey], values[self.classKey], values[self.key], true)
     end
 
-    field:SetSelection("", "", false)
+    field:SetSelection(BotControl.GetDefaultRoleForField(definition.key), "", "", false)
 
     return field
 end
@@ -944,6 +1035,9 @@ function BotControl.RegisterTabElements(frame)
                 BotControl.AddElement(BotControl_ProfileElements, field.label)
                 if field.editBox then
                     BotControl.AddElement(BotControl_ProfileElements, field.editBox)
+                end
+                if field.roleDropdown then
+                    BotControl.AddElement(BotControl_ProfileElements, field.roleDropdown)
                 end
                 if field.classDropdown then
                     BotControl.AddElement(BotControl_ProfileElements, field.classDropdown)
@@ -1407,14 +1501,24 @@ function BotControl.BuildProfileFromValues(values)
             dps1 = BotControl.CreateProfileBuildEntry(values.dps1Class, values.dps1Build),
             dps2 = BotControl.CreateProfileBuildEntry(values.dps2Class, values.dps2Build),
             dps3 = BotControl.CreateProfileBuildEntry(values.dps3Class, values.dps3Build)
+        },
+        slots = {
+            BotControl.CreateProfileSlotEntry(values.tankName, values.tankRole, values.tankClass, values.tankBuild, "tank"),
+            BotControl.CreateProfileSlotEntry(values.healName, values.healRole, values.healClass, values.healBuild, "heal"),
+            BotControl.CreateProfileSlotEntry(values.dps1Name, values.dps1Role, values.dps1Class, values.dps1Build, "dps"),
+            BotControl.CreateProfileSlotEntry(values.dps2Name, values.dps2Role, values.dps2Class, values.dps2Build, "dps"),
+            BotControl.CreateProfileSlotEntry(values.dps3Name, values.dps3Role, values.dps3Class, values.dps3Build, "dps")
         }
     }
 end
 
 function BotControl.BuildValuesFromProfile(profile)
     local values = {}
+    local name
+    local roleName
     local className
     local specName
+    local slots
 
     if type(profile) ~= "table" then
         return values
@@ -1426,6 +1530,9 @@ function BotControl.BuildValuesFromProfile(profile)
     if type(profile.builds) ~= "table" then
         profile.builds = {}
     end
+    if type(profile.slots) == "table" then
+        slots = profile.slots
+    end
 
     values.tankName = profile.bots.tank or ""
     values.healName = profile.bots.heal or ""
@@ -1433,23 +1540,33 @@ function BotControl.BuildValuesFromProfile(profile)
     values.dps2Name = profile.bots.dps2 or ""
     values.dps3Name = profile.bots.dps3 or ""
 
-    className, specName = BotControl.ExtractBuildSelection(profile.builds.tank, profile.classes and profile.classes.tank)
+    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[1], profile.bots.tank, "tank", profile.builds.tank)
+    values.tankName = name
+    values.tankRole = roleName
     values.tankClass = className
     values.tankBuild = specName
 
-    className, specName = BotControl.ExtractBuildSelection(profile.builds.heal, profile.classes and profile.classes.heal)
+    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[2], profile.bots.heal, "heal", profile.builds.heal)
+    values.healName = name
+    values.healRole = roleName
     values.healClass = className
     values.healBuild = specName
 
-    className, specName = BotControl.ExtractBuildSelection(profile.builds.dps1, profile.classes and profile.classes.dps1)
+    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[3], profile.bots.dps1, "dps", profile.builds.dps1)
+    values.dps1Name = name
+    values.dps1Role = roleName
     values.dps1Class = className
     values.dps1Build = specName
 
-    className, specName = BotControl.ExtractBuildSelection(profile.builds.dps2, profile.classes and profile.classes.dps2)
+    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[4], profile.bots.dps2, "dps", profile.builds.dps2)
+    values.dps2Name = name
+    values.dps2Role = roleName
     values.dps2Class = className
     values.dps2Build = specName
 
-    className, specName = BotControl.ExtractBuildSelection(profile.builds.dps3, profile.classes and profile.classes.dps3)
+    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[5], profile.bots.dps3, "dps", profile.builds.dps3)
+    values.dps3Name = name
+    values.dps3Role = roleName
     values.dps3Class = className
     values.dps3Build = specName
 
@@ -1479,6 +1596,11 @@ function BotControl_SaveProfile(profileName)
             dps1Name = BotControlConfig:GetValue("dps1Name"),
             dps2Name = BotControlConfig:GetValue("dps2Name"),
             dps3Name = BotControlConfig:GetValue("dps3Name"),
+            tankRole = BotControlConfig:GetValue("tankRole"),
+            healRole = BotControlConfig:GetValue("healRole"),
+            dps1Role = BotControlConfig:GetValue("dps1Role"),
+            dps2Role = BotControlConfig:GetValue("dps2Role"),
+            dps3Role = BotControlConfig:GetValue("dps3Role"),
             tankClass = BotControlConfig:GetValue("tankClass"),
             healClass = BotControlConfig:GetValue("healClass"),
             dps1Class = BotControlConfig:GetValue("dps1Class"),
@@ -1636,6 +1758,7 @@ function BotControl_LayoutButtons()
 
     if namesHeader then
         namesHeader:ClearAllPoints()
+        namesHeader:SetText("Bots")
         namesHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -58)
     end
 
@@ -1647,14 +1770,14 @@ function BotControl_LayoutButtons()
 
     if profilesListLabel then
         profilesListLabel:ClearAllPoints()
-        profilesListLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 398, -58)
+        profilesListLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 436, -58)
     end
 
     if profilesListFrame then
         profilesListFrame:ClearAllPoints()
         profilesListFrame:SetWidth(138)
         profilesListFrame:SetHeight(160)
-        profilesListFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 394, -76)
+        profilesListFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 432, -76)
     end
 
     if profileNameLabel then

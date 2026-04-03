@@ -81,8 +81,62 @@ local function AddSlash(commands, command)
     end
 end
 
+local function BuildRoleSlot(name, roleName, buildName, fallbackRole)
+    return {
+        name = BotControl.Trim(name or ""),
+        role = BotControl.NormalizeRole(roleName, fallbackRole),
+        build = BotControl.Trim(buildName or "")
+    }
+end
+
+local function ResolveConfigByRole(db)
+    local cfg = {}
+    local slots = {
+        BuildRoleSlot(db.tankName, db.tankRole, db.tankBuild, "tank"),
+        BuildRoleSlot(db.healName, db.healRole, db.healBuild, "heal"),
+        BuildRoleSlot(db.dps1Name, db.dps1Role, db.dps1Build, "dps"),
+        BuildRoleSlot(db.dps2Name, db.dps2Role, db.dps2Build, "dps"),
+        BuildRoleSlot(db.dps3Name, db.dps3Role, db.dps3Build, "dps")
+    }
+    local dpsSlots = {}
+    local index
+    local slot
+
+    for index = 1, table.getn(slots) do
+        slot = slots[index]
+
+        if slot.role == "tank" then
+            if not BotControl.HasValue(cfg.tankName) then
+                cfg.tankName = slot.name
+                cfg.tankBuild = slot.build
+            end
+        elseif slot.role == "heal" then
+            if not BotControl.HasValue(cfg.healName) then
+                cfg.healName = slot.name
+                cfg.healBuild = slot.build
+            end
+        elseif BotControl.HasValue(slot.name) or BotControl.HasValue(slot.build) then
+            table.insert(dpsSlots, slot)
+        end
+    end
+
+    cfg.dps1Name = dpsSlots[1] and dpsSlots[1].name or ""
+    cfg.dps1Build = dpsSlots[1] and dpsSlots[1].build or ""
+    cfg.dps2Name = dpsSlots[2] and dpsSlots[2].name or ""
+    cfg.dps2Build = dpsSlots[2] and dpsSlots[2].build or ""
+    cfg.dps3Name = dpsSlots[3] and dpsSlots[3].name or ""
+    cfg.dps3Build = dpsSlots[3] and dpsSlots[3].build or ""
+
+    cfg.tankName = cfg.tankName or ""
+    cfg.tankBuild = cfg.tankBuild or ""
+    cfg.healName = cfg.healName or ""
+    cfg.healBuild = cfg.healBuild or ""
+
+    return cfg
+end
+
 function BotControlActions:GetConfig()
-    return BotControlConfig:GetDB()
+    return ResolveConfigByRole(BotControlConfig:GetDB())
 end
 
 function BotControlActions:BuildCommands()

@@ -4,6 +4,7 @@
 ## Author: OpenAI
 ## Version: 1.0.0
 ## SavedVariables: BotControlDB
+## SavedVariablesPerCharacter: BotControlCharacterDB
 
 BotControl_Config.lua
 BotControl_Actions.lua

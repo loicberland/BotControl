@@ -54,16 +54,40 @@ local function CopyDefaults(target, defaults)
     return target
 end
 
-function BotControlConfig:Initialize()
-    if type(BotControlDB) ~= "table" then
-        BotControlDB = {}
+local function CloneTable(source)
+    local copy = {}
+    local key
+    local value
+
+    if type(source) ~= "table" then
+        return source
     end
 
-    BotControlDB = CopyDefaults(BotControlDB, self.defaults)
+    for key, value in pairs(source) do
+        if type(value) == "table" then
+            copy[key] = CloneTable(value)
+        else
+            copy[key] = value
+        end
+    end
+
+    return copy
+end
+
+function BotControlConfig:Initialize()
+    if type(BotControlCharacterDB) ~= "table" then
+        if type(BotControlDB) == "table" then
+            BotControlCharacterDB = CloneTable(BotControlDB)
+        else
+            BotControlCharacterDB = {}
+        end
+    end
+
+    BotControlCharacterDB = CopyDefaults(BotControlCharacterDB, self.defaults)
 end
 
 function BotControlConfig:GetDB()
-    return BotControlDB or self.defaults
+    return BotControlCharacterDB or self.defaults
 end
 
 function BotControlConfig:GetValue(key)

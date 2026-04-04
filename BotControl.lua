@@ -423,7 +423,7 @@ function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onS
 end
 
 function BotControl.Print(message)
-    DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99[BotControl]|r " .. message)
+    return
 end
 
 function BotControl.Toggle()
@@ -712,7 +712,6 @@ function BotControl_UpdateFrameSizeForView(mainTab, subTab)
 
     frame:SetWidth(width)
     frame:SetHeight(height)
-    print("BotControl: Frame size -> " .. width .. "x" .. height)
 end
 
 function BotControl_UpdateFrameSize(viewName, iconCount)
@@ -1131,7 +1130,6 @@ function BotControl_ShowActionsSubTab(tabName)
 
     BotControl_UpdateFrameSizeForView("Actions", tabName)
     BotControl_LayoutButtons()
-    print("BotControl: Actions subtab -> " .. tabName)
 end
 
 function BotControl_ShowTab(tabName)
@@ -1179,7 +1177,6 @@ function BotControl_ShowTab(tabName)
         BotControl_LayoutButtons()
     end
 
-    print("BotControl: switched to " .. tabName)
 end
 
 function BotControl.InitializeFrame(frame)
@@ -1580,7 +1577,6 @@ function BotControl_SaveProfile(profileName)
 
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
-        print("BotControl: profile name is empty")
         return
     end
 
@@ -1623,7 +1619,6 @@ function BotControl_SaveProfile(profileName)
     BotControl.SyncGroupsToDB(values)
     BotControl.selectedProfileName = profileName
     BotControl.RefreshProfileList()
-    print("BotControl: profile saved -> " .. profileName)
 end
 
 function BotControl_LoadProfile(profileName)
@@ -1635,7 +1630,6 @@ function BotControl_LoadProfile(profileName)
 
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
-        print("BotControl: profile name is empty")
         return
     end
 
@@ -1645,7 +1639,6 @@ function BotControl_LoadProfile(profileName)
 
     profile = db.profiles[profileName]
     if type(profile) ~= "table" then
-        print("BotControl: profile not found -> " .. profileName)
         return
     end
 
@@ -1659,7 +1652,6 @@ function BotControl_LoadProfile(profileName)
     BotControl.ApplyValuesToUI(frame, values)
     BotControl.selectedProfileName = profileName
     BotControl.RefreshProfileList()
-    print("BotControl: profile loaded -> " .. profileName)
 end
 
 function BotControl_DeleteProfile(profileName)
@@ -1667,7 +1659,6 @@ function BotControl_DeleteProfile(profileName)
 
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
-        print("BotControl: profile name is empty")
         return
     end
 
@@ -1676,7 +1667,6 @@ function BotControl_DeleteProfile(profileName)
     end
 
     if not db.profiles[profileName] then
-        print("BotControl: profile not found -> " .. profileName)
         return
     end
 
@@ -1685,7 +1675,6 @@ function BotControl_DeleteProfile(profileName)
         BotControl.selectedProfileName = nil
     end
     BotControl.RefreshProfileList()
-    print("BotControl: profile deleted -> " .. profileName)
 end
 
 function BotControl_LayoutButtons()
@@ -1976,13 +1965,11 @@ function BotControl_LayoutButtons()
         saveButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 20)
     end
 
-    print("BotControl: layout applied")
 end
 
 function BotControl.Save()
     BotControlConfig:SaveFromUI(BotControlFrame)
     BotControl.SyncGroupsToDB(BotControl.GetFieldValuesFromUI(BotControlFrame))
-    BotControl.Print("Configuration saved.")
 end
 
 function BotControl.Load()
@@ -2025,7 +2012,6 @@ function BotControl.ExecuteSlashCommand(command)
 
     editBox = ChatFrameEditBox or DEFAULT_CHAT_FRAME.editBox
     if not editBox then
-        BotControl.Print("Unable to access chat edit box for command: " .. command)
         return
     end
 
@@ -2144,10 +2130,13 @@ function BotControl.SetupSlashCommands()
 end
 
 function BotControl.HandleEvent()
+    local db
+
     if event == "ADDON_LOADED" and arg1 == "BotControl" then
         BotControlConfig:Initialize()
-        if type(BotControlDB.profiles) ~= "table" then
-            BotControlDB.profiles = {}
+        db = BotControlConfig:GetDB()
+        if type(db.profiles) ~= "table" then
+            db.profiles = {}
         end
         BotControl.SetupSlashCommands()
     elseif event == "PLAYER_LOGIN" then
@@ -2170,9 +2159,12 @@ function BotControl.OnFrameShow()
 end
 
 function BotControl_OnLoad(frame)
+    local db
+
     BotControlConfig:Initialize()
-    if type(BotControlDB.profiles) ~= "table" then
-        BotControlDB.profiles = {}
+    db = BotControlConfig:GetDB()
+    if type(db.profiles) ~= "table" then
+        db.profiles = {}
     end
     BotControl.InitializeFrame(frame)
     BotControl_LayoutButtons()

@@ -324,11 +324,9 @@ function BotControlActions:RunAction(actionKey)
 
     definition = self.definitions[actionKey]
     if not definition or not self[definition.builder] then
-        BotControl.Print("Unknown action: " .. tostring(actionKey))
         return
     end
 
-    BotControl.Print("Running action: " .. definition.label)
     commands = self[definition.builder](self)
     BotControl.RunCommands(commands)
 end
@@ -355,7 +353,6 @@ function BotControl_Action_InitBots()
     local commands
 
     if BotControlActions and BotControlActions.InitBotsCommands and BotControl.RunCommandsQueued then
-        BotControl.Print("Running action: Init bots")
         commands = BotControlActions:InitBotsCommands()
         BotControl.RunCommandsQueued(commands)
     end
@@ -392,8 +389,6 @@ function BotControl_Action_Used()
 end
 
 function BotControl_Action_FullSetup()
-    print("BotControl: Running Full Setup")
-
     if BotControl_Action_Build then
         BotControl_Action_Build()
     end

@@ -5,9 +5,11 @@ BotControl_ActionSubTabElements = {}
 BotControl_ActionConfigElements = {}
 BotControl_ActionCombatElements = {}
 BotControl.selectedProfileName = nil
+BotControl.selectedProfileNamesByFormat = {}
 BotControl_SelectedProfileName = nil
 BotControl.currentTab = "Profiles"
 BotControl.currentActionsSubTab = "Config"
+BotControl.activeProfileFormat = "party5"
 
 BotControl.PROFILES_FRAME_WIDTH = 595
 BotControl.PROFILES_FRAME_HEIGHT = 350
@@ -20,6 +22,69 @@ BotControl.ACTIONS_ROW_SPACING = 16
 BotControl.ACTIONS_ICONS_PER_ROW = 3
 BotControl.COMMAND_INTERVAL = 0.15
 BotControl.commandQueue = {}
+BotControl.MAX_PROFILE_SLOTS = 25
+BotControl.PROFILE_SLOT_ROWS = 5
+BotControl.PROFILE_SLOT_TOP_OFFSET = -102
+BotControl.PROFILE_SLOT_ROW_HEIGHT = 40
+BotControl.PROFILE_SLOT_COLUMN_X = 24
+BotControl.PROFILE_SLOT_COLUMN_WIDTH = 350
+BotControl.PROFILE_SLOT_COLUMN_GAP = 26
+BotControl.PROFILE_SLOT_NAME_WIDTH = 104
+BotControl.PROFILE_SLOT_ROLE_DROPDOWN_X = 110
+BotControl.PROFILE_SLOT_ROLE_WIDTH = 48
+BotControl.PROFILE_SLOT_CLASS_WIDTH = 50
+BotControl.PROFILE_SLOT_SPEC_WIDTH = 62
+BotControl.PROFILE_SLOT_DROPDOWN_SPACING = -12
+BotControl.PROFILE_GROUP_HEIGHT = 210
+BotControl.PROFILE_GROUP_GAP_Y = 34
+BotControl.PROFILE_SIDE_PANEL_GAP = 24
+BotControl.PROFILE_SIDE_PANEL_WIDTH = 138
+BotControl.PROFILE_SIDE_PANEL_MIN_X = 432
+
+BotControl.PROFILE_FORMATS = {
+    party5 = {
+        key = "party5",
+        label = "5 joueurs",
+        slotCount = 5,
+        columnCount = 1,
+        frameHeight = 350,
+        groupLayout = {
+            { column = 1, row = 1 }
+        }
+    },
+    raid10 = {
+        key = "raid10",
+        label = "10 joueurs",
+        slotCount = 10,
+        columnCount = 1,
+        frameHeight = 650,
+        groupLayout = {
+            { column = 1, row = 1 },
+            { column = 1, row = 2 }
+        }
+    },
+    raid25 = {
+        key = "raid25",
+        label = "25 joueurs",
+        slotCount = 25,
+        columnCount = 3,
+        frameHeight = 650,
+        sidePanelGap = 50,
+        groupLayout = {
+            { column = 1, row = 1 },
+            { column = 1, row = 2 },
+            { column = 2, row = 1, xOffset = 20 },
+            { column = 2, row = 2, xOffset = 20 },
+            { column = 3, row = 1, xOffset = 40 }
+        }
+    }
+}
+
+BotControl.PROFILE_FORMAT_ORDER = {
+    "party5",
+    "raid10",
+    "raid25"
+}
 
 BotControl.ACTION_BUTTON_CONFIG = {
     ComposeGroup = {
@@ -201,12 +266,19 @@ function BotControl.HasValue(value)
 end
 
 function BotControl.GetDefaultRoleForField(key)
+    local slotIndex
+
     if key == "tankName" or key == "tankBuild" then
         return "tank"
     end
 
     if key == "healName" or key == "healBuild" then
         return "heal"
+    end
+
+    slotIndex = tonumber(string.match(key or "", "^slot(%d+)"))
+    if slotIndex then
+        return BotControl.GetDefaultRoleForSlotIndex(slotIndex)
     end
 
     return "dps"
@@ -367,6 +439,473 @@ function BotControl.ExtractSlotSelection(slotData, fallbackName, fallbackRole, f
     return name, roleName, className, specName
 end
 
+function BotControl.NormalizeProfileFormat(formatKey)
+    if type(formatKey) == "number" then
+        if formatKey == 10 then
+            formatKey = "raid10"
+        elseif formatKey == 25 then
+            formatKey = "raid25"
+        else
+            formatKey = "party5"
+        end
+    end
+
+    if type(BotControl.PROFILE_FORMATS[formatKey]) == "table" then
+        return formatKey
+    end
+
+    return "party5"
+end
+
+function BotControl.GetProfileFormatConfig(formatKey)
+    return BotControl.PROFILE_FORMATS[BotControl.NormalizeProfileFormat(formatKey)]
+end
+
+function BotControl.GetProfileSlotCount(formatKey)
+    return BotControl.GetProfileFormatConfig(formatKey).slotCount
+end
+
+function BotControl.GetProfileColumnCount(formatKey)
+    return BotControl.GetProfileFormatConfig(formatKey).columnCount
+end
+
+function BotControl.GetProfileFrameHeight(formatKey)
+    return BotControl.GetProfileFormatConfig(formatKey).frameHeight or BotControl.PROFILES_FRAME_HEIGHT
+end
+
+function BotControl.GetProfileGroupPosition(formatKey, groupIndex)
+    local config = BotControl.GetProfileFormatConfig(formatKey)
+    local groupLayout = config.groupLayout or {}
+
+    return groupLayout[groupIndex] or groupLayout[1] or { column = 1, row = 1 }
+end
+
+function BotControl.GetProfileGroupX(formatKey, groupIndex)
+    local groupPosition = BotControl.GetProfileGroupPosition(formatKey, groupIndex)
+
+    return BotControl.PROFILE_SLOT_COLUMN_X
+        + ((groupPosition.column - 1) * (BotControl.PROFILE_SLOT_COLUMN_WIDTH + BotControl.PROFILE_SLOT_COLUMN_GAP))
+        + (groupPosition.xOffset or 0)
+end
+
+function BotControl.GetProfileSidePanelX(formatKey)
+    local config = BotControl.GetProfileFormatConfig(formatKey)
+    local groupLayout = config.groupLayout or {}
+    local sidePanelGap = config.sidePanelGap or BotControl.PROFILE_SIDE_PANEL_GAP
+    local maxRightX = 0
+    local groupIndex
+    local groupX
+    local computedX
+
+    for groupIndex = 1, table.getn(groupLayout) do
+        groupX = BotControl.GetProfileGroupX(formatKey, groupIndex) + BotControl.PROFILE_SLOT_COLUMN_WIDTH
+        if groupX > maxRightX then
+            maxRightX = groupX
+        end
+    end
+
+    if maxRightX == 0 then
+        maxRightX = BotControl.PROFILE_SLOT_COLUMN_X + BotControl.PROFILE_SLOT_COLUMN_WIDTH
+    end
+
+    computedX = maxRightX + sidePanelGap
+
+    if computedX < BotControl.PROFILE_SIDE_PANEL_MIN_X then
+        return BotControl.PROFILE_SIDE_PANEL_MIN_X
+    end
+
+    return computedX
+end
+
+function BotControl.GetProfilesFrameWidth(formatKey)
+    local width = BotControl.GetProfileSidePanelX(formatKey) + BotControl.PROFILE_SIDE_PANEL_WIDTH + 24
+
+    if width < BotControl.PROFILES_FRAME_WIDTH then
+        width = BotControl.PROFILES_FRAME_WIDTH
+    end
+
+    return width
+end
+
+function BotControl.GetDefaultRoleForSlotIndex(slotIndex)
+    if slotIndex == 1 then
+        return "tank"
+    end
+
+    if slotIndex == 2 then
+        return "heal"
+    end
+
+    return "dps"
+end
+
+function BotControl.NormalizeSlotsList(slots, slotCount)
+    local normalized = {}
+    local index
+    local slot
+
+    slotCount = slotCount or table.getn(slots or {})
+
+    for index = 1, slotCount do
+        slot = type(slots) == "table" and slots[index] or nil
+        normalized[index] = BotControl.CreateProfileSlotEntry(
+            slot and slot.name or "",
+            slot and slot.role or nil,
+            slot and slot.class or "",
+            slot and (slot.spec or slot.build) or "",
+            BotControl.GetDefaultRoleForSlotIndex(index)
+        )
+    end
+
+    return normalized
+end
+
+function BotControl.BuildValuesFromSlots(slots, slotCount)
+    local values = {}
+    local normalizedSlots = BotControl.NormalizeSlotsList(slots, slotCount)
+    local index
+    local slot
+
+    slotCount = slotCount or table.getn(normalizedSlots)
+
+    for index = 1, slotCount do
+        slot = normalizedSlots[index] or {}
+        values["slot" .. index .. "Name"] = slot.name or ""
+        values["slot" .. index .. "Role"] = slot.role or BotControl.GetDefaultRoleForSlotIndex(index)
+        values["slot" .. index .. "Class"] = slot.class or ""
+        values["slot" .. index .. "Spec"] = slot.spec or ""
+    end
+
+    return values
+end
+
+function BotControl.BuildSlotsFromValues(values, slotCount)
+    local slots = {}
+    local index
+
+    slotCount = slotCount or BotControl.MAX_PROFILE_SLOTS
+
+    if type(values) ~= "table" then
+        values = {}
+    end
+
+    for index = 1, slotCount do
+        slots[index] = BotControl.CreateProfileSlotEntry(
+            values["slot" .. index .. "Name"],
+            values["slot" .. index .. "Role"],
+            values["slot" .. index .. "Class"],
+            values["slot" .. index .. "Spec"],
+            BotControl.GetDefaultRoleForSlotIndex(index)
+        )
+    end
+
+    return slots
+end
+
+function BotControl.HasAnySlotData(slots)
+    local index
+    local slot
+
+    if type(slots) ~= "table" then
+        return false
+    end
+
+    for index = 1, table.getn(slots) do
+        slot = slots[index]
+        if type(slot) == "table" and (
+            BotControl.HasValue(slot.name) or
+            BotControl.HasValue(slot.class) or
+            BotControl.HasValue(slot.spec)
+        ) then
+            return true
+        end
+    end
+
+    return false
+end
+
+function BotControl.BuildLegacySlotsFromDB(db)
+    return {
+        BotControl.CreateProfileSlotEntry(db.tankName, db.tankRole, db.tankClass, db.tankBuild, "tank"),
+        BotControl.CreateProfileSlotEntry(db.healName, db.healRole, db.healClass, db.healBuild, "heal"),
+        BotControl.CreateProfileSlotEntry(db.dps1Name, db.dps1Role, db.dps1Class, db.dps1Build, "dps"),
+        BotControl.CreateProfileSlotEntry(db.dps2Name, db.dps2Role, db.dps2Class, db.dps2Build, "dps"),
+        BotControl.CreateProfileSlotEntry(db.dps3Name, db.dps3Role, db.dps3Class, db.dps3Build, "dps")
+    }
+end
+
+function BotControl.GetLegacyRoleGroups(slots)
+    local groups = {
+        tank = {},
+        heal = {},
+        dps = {}
+    }
+    local normalizedSlots = BotControl.NormalizeSlotsList(slots, table.getn(slots or {}))
+    local index
+    local slot
+
+    for index = 1, table.getn(normalizedSlots) do
+        slot = normalizedSlots[index]
+        if BotControl.HasValue(slot.name) or BotControl.HasValue(slot.spec) or BotControl.HasValue(slot.class) then
+            table.insert(groups[slot.role], slot)
+        end
+    end
+
+    return groups
+end
+
+function BotControl.BuildLegacyValuesFromSlots(slots)
+    local groups = BotControl.GetLegacyRoleGroups(slots)
+    local values = {}
+
+    values.tankName = groups.tank[1] and groups.tank[1].name or ""
+    values.tankRole = groups.tank[1] and groups.tank[1].role or "tank"
+    values.tankClass = groups.tank[1] and groups.tank[1].class or ""
+    values.tankBuild = groups.tank[1] and groups.tank[1].spec or ""
+
+    values.healName = groups.heal[1] and groups.heal[1].name or ""
+    values.healRole = groups.heal[1] and groups.heal[1].role or "heal"
+    values.healClass = groups.heal[1] and groups.heal[1].class or ""
+    values.healBuild = groups.heal[1] and groups.heal[1].spec or ""
+
+    values.dps1Name = groups.dps[1] and groups.dps[1].name or ""
+    values.dps1Role = groups.dps[1] and groups.dps[1].role or "dps"
+    values.dps1Class = groups.dps[1] and groups.dps[1].class or ""
+    values.dps1Build = groups.dps[1] and groups.dps[1].spec or ""
+
+    values.dps2Name = groups.dps[2] and groups.dps[2].name or ""
+    values.dps2Role = groups.dps[2] and groups.dps[2].role or "dps"
+    values.dps2Class = groups.dps[2] and groups.dps[2].class or ""
+    values.dps2Build = groups.dps[2] and groups.dps[2].spec or ""
+
+    values.dps3Name = groups.dps[3] and groups.dps[3].name or ""
+    values.dps3Role = groups.dps[3] and groups.dps[3].role or "dps"
+    values.dps3Class = groups.dps[3] and groups.dps[3].class or ""
+    values.dps3Build = groups.dps[3] and groups.dps[3].spec or ""
+
+    return values
+end
+
+function BotControl.ApplyLegacyStateFromSlots(slots)
+    local db = BotControlConfig:GetDB()
+    local values = BotControl.BuildLegacyValuesFromSlots(slots)
+
+    if type(db.bots) ~= "table" then
+        db.bots = {}
+    end
+    if type(db.builds) ~= "table" then
+        db.builds = {}
+    end
+
+    db.tankName = values.tankName
+    db.healName = values.healName
+    db.dps1Name = values.dps1Name
+    db.dps2Name = values.dps2Name
+    db.dps3Name = values.dps3Name
+
+    db.tankRole = values.tankRole
+    db.healRole = values.healRole
+    db.dps1Role = values.dps1Role
+    db.dps2Role = values.dps2Role
+    db.dps3Role = values.dps3Role
+
+    db.tankClass = values.tankClass
+    db.healClass = values.healClass
+    db.dps1Class = values.dps1Class
+    db.dps2Class = values.dps2Class
+    db.dps3Class = values.dps3Class
+
+    db.tankBuild = values.tankBuild
+    db.healBuild = values.healBuild
+    db.dps1Build = values.dps1Build
+    db.dps2Build = values.dps2Build
+    db.dps3Build = values.dps3Build
+
+    db.bots.tank = values.tankName
+    db.bots.heal = values.healName
+    db.bots.dps1 = values.dps1Name
+    db.bots.dps2 = values.dps2Name
+    db.bots.dps3 = values.dps3Name
+
+    db.builds.tank = values.tankBuild
+    db.builds.heal = values.healBuild
+    db.builds.dps1 = values.dps1Build
+    db.builds.dps2 = values.dps2Build
+    db.builds.dps3 = values.dps3Build
+end
+
+function BotControl.EnsureProfileStorage()
+    local db = BotControlConfig:GetDB()
+    local legacyProfileNames = {}
+    local profileName
+    local formatKey
+    local workingSet
+
+    if type(db.profiles) ~= "table" then
+        db.profiles = {}
+    end
+
+    for profileName in pairs(db.profiles) do
+        if profileName ~= "party5" and profileName ~= "raid10" and profileName ~= "raid25" then
+            table.insert(legacyProfileNames, profileName)
+        end
+    end
+
+    if type(db.profiles.party5) ~= "table" then
+        db.profiles.party5 = {}
+    end
+    if type(db.profiles.raid10) ~= "table" then
+        db.profiles.raid10 = {}
+    end
+    if type(db.profiles.raid25) ~= "table" then
+        db.profiles.raid25 = {}
+    end
+
+    for _, profileName in ipairs(legacyProfileNames) do
+        if db.profiles.party5[profileName] == nil then
+            db.profiles.party5[profileName] = db.profiles[profileName]
+        end
+        db.profiles[profileName] = nil
+    end
+
+    if type(db.currentSlotsByFormat) ~= "table" then
+        db.currentSlotsByFormat = {}
+    end
+
+    for _, formatKey in ipairs(BotControl.PROFILE_FORMAT_ORDER) do
+        if type(db.currentSlotsByFormat[formatKey]) ~= "table" then
+            db.currentSlotsByFormat[formatKey] = {}
+        end
+
+        workingSet = db.currentSlotsByFormat[formatKey]
+        if type(workingSet.slots) ~= "table" then
+            workingSet.slots = {}
+        end
+
+        workingSet.slots = BotControl.NormalizeSlotsList(workingSet.slots, BotControl.GetProfileSlotCount(formatKey))
+    end
+
+    if not BotControl.HasAnySlotData(db.currentSlotsByFormat.party5.slots) then
+        db.currentSlotsByFormat.party5.slots = BotControl.NormalizeSlotsList(BotControl.BuildLegacySlotsFromDB(db), 5)
+    end
+
+    db.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
+    BotControl.activeProfileFormat = db.activeProfileFormat
+end
+
+function BotControl.GetActiveProfileFormat()
+    return BotControl.NormalizeProfileFormat(BotControl.activeProfileFormat)
+end
+
+function BotControl.GetProfilesTable(formatKey)
+    local db = BotControlConfig:GetDB()
+
+    BotControl.EnsureProfileStorage()
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+
+    return db.profiles[formatKey]
+end
+
+function BotControl.GetWorkingSlots(formatKey)
+    local db = BotControlConfig:GetDB()
+
+    BotControl.EnsureProfileStorage()
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+
+    return BotControl.NormalizeSlotsList(db.currentSlotsByFormat[formatKey].slots, BotControl.GetProfileSlotCount(formatKey))
+end
+
+function BotControl.SetWorkingSlots(formatKey, slots)
+    local db = BotControlConfig:GetDB()
+
+    BotControl.EnsureProfileStorage()
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+    db.currentSlotsByFormat[formatKey].slots = BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
+
+    if BotControl.GetActiveProfileFormat() == formatKey then
+        BotControl.ApplyLegacyStateFromSlots(db.currentSlotsByFormat[formatKey].slots)
+    end
+end
+
+function BotControl.GetActiveProfileSlots()
+    return BotControl.GetWorkingSlots(BotControl.GetActiveProfileFormat())
+end
+
+function BotControl.BuildProfileFromSlots(formatKey, slots)
+    local normalizedSlots = BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
+    local profile = {
+        slots = normalizedSlots
+    }
+    local legacyValues
+
+    if BotControl.NormalizeProfileFormat(formatKey) == "party5" then
+        legacyValues = BotControl.BuildLegacyValuesFromSlots(normalizedSlots)
+        profile.bots = {
+            tank = legacyValues.tankName,
+            heal = legacyValues.healName,
+            dps1 = legacyValues.dps1Name,
+            dps2 = legacyValues.dps2Name,
+            dps3 = legacyValues.dps3Name
+        }
+        profile.builds = {
+            tank = BotControl.CreateProfileBuildEntry(legacyValues.tankClass, legacyValues.tankBuild),
+            heal = BotControl.CreateProfileBuildEntry(legacyValues.healClass, legacyValues.healBuild),
+            dps1 = BotControl.CreateProfileBuildEntry(legacyValues.dps1Class, legacyValues.dps1Build),
+            dps2 = BotControl.CreateProfileBuildEntry(legacyValues.dps2Class, legacyValues.dps2Build),
+            dps3 = BotControl.CreateProfileBuildEntry(legacyValues.dps3Class, legacyValues.dps3Build)
+        }
+    end
+
+    return profile
+end
+
+function BotControl.BuildSlotsFromProfile(profile, formatKey)
+    local slots = {}
+    local index
+    local name
+    local roleName
+    local className
+    local specName
+
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+    if type(profile) ~= "table" then
+        return BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
+    end
+
+    if type(profile.slots) == "table" then
+        return BotControl.NormalizeSlotsList(profile.slots, BotControl.GetProfileSlotCount(formatKey))
+    end
+
+    if formatKey ~= "party5" then
+        return BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
+    end
+
+    if type(profile.bots) ~= "table" then
+        profile.bots = {}
+    end
+    if type(profile.builds) ~= "table" then
+        profile.builds = {}
+    end
+
+    for index = 1, 5 do
+        if index == 1 then
+            name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.tank, "tank", profile.builds.tank)
+        elseif index == 2 then
+            name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.heal, "heal", profile.builds.heal)
+        elseif index == 3 then
+            name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.dps1, "dps", profile.builds.dps1)
+        elseif index == 4 then
+            name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.dps2, "dps", profile.builds.dps2)
+        else
+            name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.dps3, "dps", profile.builds.dps3)
+        end
+
+        slots[index] = BotControl.CreateProfileSlotEntry(name, roleName, className, specName, BotControl.GetDefaultRoleForSlotIndex(index))
+    end
+
+    return BotControl.NormalizeSlotsList(slots, 5)
+end
+
 function BotControl.UpdateDropdownValue(dropdown, value, emptyText)
     value = BotControl.Trim(value or "")
     dropdown.selectedValue = value
@@ -460,13 +999,16 @@ function BotControl.RegisterSpecialFrame(frameName)
 end
 
 function BotControl.CreateTextField(parent, definition)
-    local rowY = -78 - ((definition.order - 1) * 40)
+    local rowY = definition.rowY or (-78 - ((definition.order - 1) * 40))
     local labelX
     local boxX
     local label
     local editBox
 
-    if definition.column == "left" then
+    if definition.labelX then
+        labelX = definition.labelX
+        boxX = definition.boxX or definition.labelX
+    elseif definition.column == "left" then
         labelX = 24
         boxX = 24
     else
@@ -480,7 +1022,9 @@ function BotControl.CreateTextField(parent, definition)
     label:SetText(definition.label)
 
     editBox = CreateFrame("EditBox", nil, parent)
-    if definition.column == "left" then
+    if definition.editWidth then
+        editBox:SetWidth(definition.editWidth)
+    elseif definition.column == "left" then
         editBox:SetWidth(140)
     else
         editBox:SetWidth(150)
@@ -525,35 +1069,36 @@ function BotControl.CreateTextField(parent, definition)
 end
 
 function BotControl.CreateClassSpecField(parent, definition)
-    local rowY = -78 - ((definition.order - 1) * 40)
+    local rowY = definition.rowY or (-78 - ((definition.order - 1) * 40))
     local roleDropdown
     local classDropdown
     local specDropdown
     local field
     local roleItems = BotControl.CopyList(BotControl.Roles)
     local classItems = BotControl.CopyList(BotControl.Classes)
-    local roleDropdownX = 150
-    local roleDropdownWidth = 42
-    local classDropdownWidth = 56
-    local firstDropdownSpacing = -18
-    local dropdownSpacing = -18
-    local specDropdownWidth = 68
+    local roleDropdownX = definition.roleDropdownX or 150
+    local roleDropdownWidth = definition.roleDropdownWidth or 42
+    local classDropdownWidth = definition.classDropdownWidth or 56
+    local firstDropdownSpacing = definition.firstDropdownSpacing or -18
+    local dropdownSpacing = definition.dropdownSpacing or -18
+    local specDropdownWidth = definition.specDropdownWidth or 68
+    local dropdownName = definition.namePrefix or definition.key
 
     table.insert(classItems, 1, "")
 
-    roleDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "RoleDropDown", parent, "UIDropDownMenuTemplate")
+    roleDropdown = CreateFrame("Frame", "BotControl" .. dropdownName .. "RoleDropDown", parent, "UIDropDownMenuTemplate")
     roleDropdown:ClearAllPoints()
     roleDropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", roleDropdownX, rowY - 8)
     UIDropDownMenu_SetWidth(roleDropdownWidth, roleDropdown)
     UIDropDownMenu_JustifyText("LEFT", roleDropdown)
 
-    classDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "ClassDropDown", parent, "UIDropDownMenuTemplate")
+    classDropdown = CreateFrame("Frame", "BotControl" .. dropdownName .. "ClassDropDown", parent, "UIDropDownMenuTemplate")
     classDropdown:ClearAllPoints()
     classDropdown:SetPoint("LEFT", roleDropdown, "RIGHT", firstDropdownSpacing, 0)
     UIDropDownMenu_SetWidth(classDropdownWidth, classDropdown)
     UIDropDownMenu_JustifyText("LEFT", classDropdown)
 
-    specDropdown = CreateFrame("Frame", "BotControl" .. definition.key .. "SpecDropDown", parent, "UIDropDownMenuTemplate")
+    specDropdown = CreateFrame("Frame", "BotControl" .. dropdownName .. "SpecDropDown", parent, "UIDropDownMenuTemplate")
     specDropdown:ClearAllPoints()
     specDropdown:SetPoint("LEFT", classDropdown, "RIGHT", dropdownSpacing, 0)
     UIDropDownMenu_SetWidth(specDropdownWidth, specDropdown)
@@ -651,15 +1196,138 @@ function BotControl.CreateField(parent, definition)
     return BotControl.CreateTextField(parent, definition)
 end
 
+function BotControl.CreateProfileSlotField(parent, slotIndex)
+    local nameKey = "slot" .. slotIndex .. "Name"
+    local roleKey = "slot" .. slotIndex .. "Role"
+    local classKey = "slot" .. slotIndex .. "Class"
+    local specKey = "slot" .. slotIndex .. "Spec"
+    local nameField
+    local specField
+    local field
+
+    nameField = BotControl.CreateTextField(parent, {
+        key = nameKey,
+        label = "Bot " .. slotIndex,
+        rowY = -78,
+        labelX = BotControl.PROFILE_SLOT_COLUMN_X,
+        boxX = BotControl.PROFILE_SLOT_COLUMN_X,
+        editWidth = BotControl.PROFILE_SLOT_NAME_WIDTH
+    })
+
+    specField = BotControl.CreateClassSpecField(parent, {
+        key = specKey,
+        roleKey = roleKey,
+        classKey = classKey,
+        rowY = -78,
+        roleDropdownX = BotControl.PROFILE_SLOT_COLUMN_X + BotControl.PROFILE_SLOT_ROLE_DROPDOWN_X,
+        roleDropdownWidth = BotControl.PROFILE_SLOT_ROLE_WIDTH,
+        classDropdownWidth = BotControl.PROFILE_SLOT_CLASS_WIDTH,
+        specDropdownWidth = BotControl.PROFILE_SLOT_SPEC_WIDTH,
+        firstDropdownSpacing = BotControl.PROFILE_SLOT_DROPDOWN_SPACING,
+        dropdownSpacing = BotControl.PROFILE_SLOT_DROPDOWN_SPACING,
+        namePrefix = "ProfileSlot" .. slotIndex
+    })
+
+    field = {
+        slotIndex = slotIndex,
+        label = nameField.label,
+        editBox = nameField.editBox,
+        roleDropdown = specField.roleDropdown,
+        classDropdown = specField.classDropdown,
+        specDropdown = specField.specDropdown,
+        CollectValues = function(self, values)
+            nameField:CollectValues(values)
+            specField:CollectValues(values)
+        end,
+        ApplyValues = function(self, values)
+            nameField:ApplyValues(values)
+            specField:ApplyValues(values)
+        end,
+        SetVisible = function(self, isVisible)
+            if isVisible then
+                self.label:Show()
+                self.editBox:Show()
+                self.roleDropdown:Show()
+                self.classDropdown:Show()
+                self.specDropdown:Show()
+            else
+                self.label:Hide()
+                self.editBox:Hide()
+                self.roleDropdown:Hide()
+                self.classDropdown:Hide()
+                self.specDropdown:Hide()
+            end
+        end
+    }
+
+    return field
+end
+
 function BotControl.BuildFields(frame)
     local index
-    local definition
 
     frame.fields = {}
+    frame.profileSlotFields = {}
 
-    for index = 1, table.getn(BotControl.FIELD_DEFINITIONS) do
-        definition = BotControl.FIELD_DEFINITIONS[index]
-        table.insert(frame.fields, BotControl.CreateField(frame, definition))
+    for index = 1, BotControl.MAX_PROFILE_SLOTS do
+        frame.profileSlotFields[index] = BotControl.CreateProfileSlotField(frame, index)
+        table.insert(frame.fields, frame.profileSlotFields[index])
+    end
+end
+
+function BotControl.LayoutProfileFields(frame)
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local slotCount = BotControl.GetProfileSlotCount(formatKey)
+    local shouldShowFields = BotControl.currentTab == "Profiles"
+    local slotField
+    local slotIndex
+    local groupIndex
+    local rowIndex
+    local groupPosition
+    local columnX
+    local rowY
+
+    if not frame or not frame.profileSlotFields then
+        return
+    end
+
+    for slotIndex = 1, table.getn(frame.profileSlotFields) do
+        slotField = frame.profileSlotFields[slotIndex]
+        if slotField then
+            if shouldShowFields and slotIndex <= slotCount then
+                groupIndex = math.floor((slotIndex - 1) / BotControl.PROFILE_SLOT_ROWS) + 1
+                rowIndex = (slotIndex - 1) - ((groupIndex - 1) * BotControl.PROFILE_SLOT_ROWS)
+                groupPosition = BotControl.GetProfileGroupPosition(formatKey, groupIndex)
+                columnX = BotControl.GetProfileGroupX(formatKey, groupIndex)
+                rowY = BotControl.PROFILE_SLOT_TOP_OFFSET
+                    - ((groupPosition.row - 1) * (BotControl.PROFILE_GROUP_HEIGHT + BotControl.PROFILE_GROUP_GAP_Y))
+                    - (rowIndex * BotControl.PROFILE_SLOT_ROW_HEIGHT)
+
+                slotField.label:ClearAllPoints()
+                slotField.label:SetPoint("TOPLEFT", frame, "TOPLEFT", columnX, rowY)
+                slotField.label:SetText("Bot " .. slotIndex)
+
+                slotField.editBox:ClearAllPoints()
+                slotField.editBox:SetPoint("TOPLEFT", frame, "TOPLEFT", columnX, rowY - 14)
+                slotField.editBox:SetWidth(BotControl.PROFILE_SLOT_NAME_WIDTH)
+
+                slotField.roleDropdown:ClearAllPoints()
+                slotField.roleDropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", columnX + BotControl.PROFILE_SLOT_ROLE_DROPDOWN_X, rowY - 8)
+                UIDropDownMenu_SetWidth(BotControl.PROFILE_SLOT_ROLE_WIDTH, slotField.roleDropdown)
+
+                slotField.classDropdown:ClearAllPoints()
+                slotField.classDropdown:SetPoint("LEFT", slotField.roleDropdown, "RIGHT", BotControl.PROFILE_SLOT_DROPDOWN_SPACING, 0)
+                UIDropDownMenu_SetWidth(BotControl.PROFILE_SLOT_CLASS_WIDTH, slotField.classDropdown)
+
+                slotField.specDropdown:ClearAllPoints()
+                slotField.specDropdown:SetPoint("LEFT", slotField.classDropdown, "RIGHT", BotControl.PROFILE_SLOT_DROPDOWN_SPACING, 0)
+                UIDropDownMenu_SetWidth(BotControl.PROFILE_SLOT_SPEC_WIDTH, slotField.specDropdown)
+
+                slotField:SetVisible(true)
+            else
+                slotField:SetVisible(false)
+            end
+        end
     end
 end
 
@@ -684,8 +1352,8 @@ function BotControl_UpdateFrameSizeForView(mainTab, subTab)
 
     if mainTab == "Profiles" then
         BotControl.currentTab = "Profiles"
-        width = BotControl.PROFILES_FRAME_WIDTH
-        height = BotControl.PROFILES_FRAME_HEIGHT
+        width = BotControl.GetProfilesFrameWidth(BotControl.GetActiveProfileFormat())
+        height = BotControl.GetProfileFrameHeight(BotControl.GetActiveProfileFormat())
     else
         BotControl.currentTab = "Actions"
         if subTab == "Combat" then
@@ -725,15 +1393,15 @@ function BotControl_UpdateFrameSize(viewName, iconCount)
 end
 
 function BotControl.GetSortedProfileNames()
-    local db = BotControlConfig:GetDB()
+    local profiles = BotControl.GetProfilesTable(BotControl.GetActiveProfileFormat())
     local names = {}
     local profileName
 
-    if type(db.profiles) ~= "table" then
+    if type(profiles) ~= "table" then
         return names
     end
 
-    for profileName in pairs(db.profiles) do
+    for profileName in pairs(profiles) do
         table.insert(names, profileName)
     end
 
@@ -743,6 +1411,13 @@ function BotControl.GetSortedProfileNames()
 end
 
 function BotControl.GetSelectedProfileName()
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local selectedName = BotControl.selectedProfileNamesByFormat[formatKey]
+
+    if BotControl.HasValue(selectedName) then
+        return selectedName
+    end
+
     if BotControl.HasValue(BotControl.selectedProfileName) then
         return BotControl.selectedProfileName
     end
@@ -751,8 +1426,11 @@ function BotControl.GetSelectedProfileName()
 end
 
 function BotControl.SelectProfile(profileName)
+    local formatKey = BotControl.GetActiveProfileFormat()
+
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
+        BotControl.selectedProfileNamesByFormat[formatKey] = nil
         BotControl.selectedProfileName = nil
         BotControl_SelectedProfileName = nil
         if BotControlProfileNameEditBox then
@@ -761,6 +1439,7 @@ function BotControl.SelectProfile(profileName)
         return
     end
 
+    BotControl.selectedProfileNamesByFormat[formatKey] = profileName
     BotControl.selectedProfileName = profileName
     BotControl_SelectedProfileName = profileName
 
@@ -773,7 +1452,9 @@ end
 
 function BotControl.RefreshProfileList()
     local names = BotControl.GetSortedProfileNames()
-    local selectedName = BotControl.selectedProfileName
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local selectedName = BotControl.selectedProfileNamesByFormat[formatKey]
+    local profiles = BotControl.GetProfilesTable(formatKey)
     local rowButtons = BotControl.profileListButtons
     local row
     local rowButton
@@ -783,10 +1464,20 @@ function BotControl.RefreshProfileList()
         return
     end
 
-    if selectedName and not BotControlConfig:GetDB().profiles[selectedName] then
+    if selectedName and type(profiles[selectedName]) ~= "table" then
         selectedName = nil
+        BotControl.selectedProfileNamesByFormat[formatKey] = nil
         BotControl.selectedProfileName = nil
         BotControl_SelectedProfileName = nil
+    end
+
+    if selectedName then
+        BotControl.selectedProfileName = selectedName
+        BotControl_SelectedProfileName = selectedName
+    end
+
+    if BotControlProfileNameEditBox then
+        BotControlProfileNameEditBox:SetText(selectedName or "")
     end
 
     for row = 1, table.getn(rowButtons) do
@@ -810,6 +1501,72 @@ function BotControl.RefreshProfileList()
             rowButton:Hide()
         end
     end
+end
+
+function BotControl.UpdateProfileSubTabs()
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local button
+    local index
+    local subTabButtons = {
+        party5 = BotControlProfilesSubTab5,
+        raid10 = BotControlProfilesSubTab10,
+        raid25 = BotControlProfilesSubTab25
+    }
+
+    for index = 1, table.getn(BotControl.PROFILE_FORMAT_ORDER) do
+        button = subTabButtons[BotControl.PROFILE_FORMAT_ORDER[index]]
+        if button then
+            if BotControl.PROFILE_FORMAT_ORDER[index] == formatKey then
+                button:Disable()
+            else
+                button:Enable()
+            end
+        end
+    end
+end
+
+function BotControl.LoadActiveSlotsToUI(frame)
+    local slots = BotControl.GetActiveProfileSlots()
+    local values = BotControl.BuildValuesFromSlots(slots, BotControl.MAX_PROFILE_SLOTS)
+
+    BotControl.ApplyValuesToUI(frame, values)
+    BotControl.ApplyLegacyStateFromSlots(slots)
+end
+
+function BotControl.SaveActiveSlotsFromUI(frame)
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local slots = BotControl.BuildSlotsFromValues(BotControl.GetFieldValuesFromUI(frame), BotControl.GetProfileSlotCount(formatKey))
+
+    BotControl.SetWorkingSlots(formatKey, slots)
+
+    return slots
+end
+
+function BotControl_ShowProfilesSubTab(formatKey)
+    local frame = BotControlFrame
+    local db = BotControlConfig:GetDB()
+    local currentFormat = BotControl.GetActiveProfileFormat()
+
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+    if not frame then
+        return
+    end
+
+    if frame.fields and currentFormat then
+        BotControl.SaveActiveSlotsFromUI(frame)
+    end
+
+    BotControl.activeProfileFormat = formatKey
+    db.activeProfileFormat = formatKey
+    BotControl.selectedProfileName = BotControl.selectedProfileNamesByFormat[formatKey]
+    BotControl_SelectedProfileName = BotControl.selectedProfileName
+
+    BotControl.LoadActiveSlotsToUI(frame)
+    BotControl.LayoutProfileFields(frame)
+    BotControl.UpdateProfileSubTabs()
+    BotControl.RefreshProfileList()
+    BotControl_UpdateFrameSizeForView("Profiles")
+    BotControl_LayoutButtons()
 end
 
 function BotControl.CleanupButtonTemplate(button)
@@ -1013,6 +1770,9 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameNamesHeader)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameBuildsHeader)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameProfileNameLabel)
+    BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesSubTab5)
+    BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesSubTab10)
+    BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesSubTab25)
     BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesListLabel)
     BotControl.AddElement(BotControl_ProfileElements, BotControlProfilesListFrame)
     BotControl.AddElement(BotControl_ProfileElements, BotControlProfileNameEditBox)
@@ -1172,6 +1932,8 @@ function BotControl_ShowTab(tabName)
             end
         end
 
+        BotControl.LayoutProfileFields(BotControlFrame)
+        BotControl.UpdateProfileSubTabs()
         BotControl.RefreshProfileList()
         BotControl_UpdateFrameSizeForView("Profiles")
         BotControl_LayoutButtons()
@@ -1206,6 +1968,9 @@ function BotControl.CreateButtons(frame)
     local deleteProfileButton
     local configSubTabButton
     local combatSubTabButton
+    local profileSubTab5Button
+    local profileSubTab10Button
+    local profileSubTab25Button
     local profileListLabel
     local profileListFrame
     local profileListButton
@@ -1254,6 +2019,36 @@ function BotControl.CreateButtons(frame)
         combatSubTabButton:SetHeight(20)
         combatSubTabButton:SetScript("OnClick", function()
             BotControl_ShowActionsSubTab("Combat")
+        end)
+    end
+
+    if not BotControlProfilesSubTab5 then
+        profileSubTab5Button = CreateFrame("Button", "BotControlProfilesSubTab5", frame, "UIPanelButtonTemplate")
+        profileSubTab5Button:SetText("5 joueurs")
+        profileSubTab5Button:SetWidth(82)
+        profileSubTab5Button:SetHeight(20)
+        profileSubTab5Button:SetScript("OnClick", function()
+            BotControl_ShowProfilesSubTab("party5")
+        end)
+    end
+
+    if not BotControlProfilesSubTab10 then
+        profileSubTab10Button = CreateFrame("Button", "BotControlProfilesSubTab10", frame, "UIPanelButtonTemplate")
+        profileSubTab10Button:SetText("10 joueurs")
+        profileSubTab10Button:SetWidth(86)
+        profileSubTab10Button:SetHeight(20)
+        profileSubTab10Button:SetScript("OnClick", function()
+            BotControl_ShowProfilesSubTab("raid10")
+        end)
+    end
+
+    if not BotControlProfilesSubTab25 then
+        profileSubTab25Button = CreateFrame("Button", "BotControlProfilesSubTab25", frame, "UIPanelButtonTemplate")
+        profileSubTab25Button:SetText("25 joueurs")
+        profileSubTab25Button:SetWidth(86)
+        profileSubTab25Button:SetHeight(20)
+        profileSubTab25Button:SetScript("OnClick", function()
+            BotControl_ShowProfilesSubTab("raid25")
         end)
     end
 
@@ -1456,223 +2251,100 @@ function BotControl.ApplyValuesToUI(frame, values)
 end
 
 function BotControl.SyncGroupsToDB(values)
-    local db
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local slotCount = BotControl.GetProfileSlotCount(formatKey)
 
     if type(values) ~= "table" then
         return
     end
 
-    db = BotControlConfig:GetDB()
-    if type(db.bots) ~= "table" then
-        db.bots = {}
+    if values[1] then
+        BotControl.SetWorkingSlots(formatKey, values)
+    else
+        BotControl.SetWorkingSlots(formatKey, BotControl.BuildSlotsFromValues(values, slotCount))
     end
-    if type(db.builds) ~= "table" then
-        db.builds = {}
-    end
-
-    db.bots.tank = values.tankName or ""
-    db.bots.heal = values.healName or ""
-    db.bots.dps1 = values.dps1Name or ""
-    db.bots.dps2 = values.dps2Name or ""
-    db.bots.dps3 = values.dps3Name or ""
-
-    db.builds.tank = values.tankBuild or ""
-    db.builds.heal = values.healBuild or ""
-    db.builds.dps1 = values.dps1Build or ""
-    db.builds.dps2 = values.dps2Build or ""
-    db.builds.dps3 = values.dps3Build or ""
 end
 
-function BotControl.BuildProfileFromValues(values)
-    return {
-        bots = {
-            tank = values.tankName or "",
-            heal = values.healName or "",
-            dps1 = values.dps1Name or "",
-            dps2 = values.dps2Name or "",
-            dps3 = values.dps3Name or ""
-        },
-        builds = {
-            tank = BotControl.CreateProfileBuildEntry(values.tankClass, values.tankBuild),
-            heal = BotControl.CreateProfileBuildEntry(values.healClass, values.healBuild),
-            dps1 = BotControl.CreateProfileBuildEntry(values.dps1Class, values.dps1Build),
-            dps2 = BotControl.CreateProfileBuildEntry(values.dps2Class, values.dps2Build),
-            dps3 = BotControl.CreateProfileBuildEntry(values.dps3Class, values.dps3Build)
-        },
-        slots = {
-            BotControl.CreateProfileSlotEntry(values.tankName, values.tankRole, values.tankClass, values.tankBuild, "tank"),
-            BotControl.CreateProfileSlotEntry(values.healName, values.healRole, values.healClass, values.healBuild, "heal"),
-            BotControl.CreateProfileSlotEntry(values.dps1Name, values.dps1Role, values.dps1Class, values.dps1Build, "dps"),
-            BotControl.CreateProfileSlotEntry(values.dps2Name, values.dps2Role, values.dps2Class, values.dps2Build, "dps"),
-            BotControl.CreateProfileSlotEntry(values.dps3Name, values.dps3Role, values.dps3Class, values.dps3Build, "dps")
-        }
-    }
+function BotControl.BuildProfileFromValues(values, formatKey)
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+    return BotControl.BuildProfileFromSlots(formatKey, BotControl.BuildSlotsFromValues(values, BotControl.GetProfileSlotCount(formatKey)))
 end
 
-function BotControl.BuildValuesFromProfile(profile)
-    local values = {}
-    local name
-    local roleName
-    local className
-    local specName
-    local slots
-
-    if type(profile) ~= "table" then
-        return values
-    end
-
-    if type(profile.bots) ~= "table" then
-        profile.bots = {}
-    end
-    if type(profile.builds) ~= "table" then
-        profile.builds = {}
-    end
-    if type(profile.slots) == "table" then
-        slots = profile.slots
-    end
-
-    values.tankName = profile.bots.tank or ""
-    values.healName = profile.bots.heal or ""
-    values.dps1Name = profile.bots.dps1 or ""
-    values.dps2Name = profile.bots.dps2 or ""
-    values.dps3Name = profile.bots.dps3 or ""
-
-    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[1], profile.bots.tank, "tank", profile.builds.tank)
-    values.tankName = name
-    values.tankRole = roleName
-    values.tankClass = className
-    values.tankBuild = specName
-
-    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[2], profile.bots.heal, "heal", profile.builds.heal)
-    values.healName = name
-    values.healRole = roleName
-    values.healClass = className
-    values.healBuild = specName
-
-    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[3], profile.bots.dps1, "dps", profile.builds.dps1)
-    values.dps1Name = name
-    values.dps1Role = roleName
-    values.dps1Class = className
-    values.dps1Build = specName
-
-    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[4], profile.bots.dps2, "dps", profile.builds.dps2)
-    values.dps2Name = name
-    values.dps2Role = roleName
-    values.dps2Class = className
-    values.dps2Build = specName
-
-    name, roleName, className, specName = BotControl.ExtractSlotSelection(slots and slots[5], profile.bots.dps3, "dps", profile.builds.dps3)
-    values.dps3Name = name
-    values.dps3Role = roleName
-    values.dps3Class = className
-    values.dps3Build = specName
-
-    return values
+function BotControl.BuildValuesFromProfile(profile, formatKey)
+    formatKey = BotControl.NormalizeProfileFormat(formatKey)
+    return BotControl.BuildValuesFromSlots(BotControl.BuildSlotsFromProfile(profile, formatKey), BotControl.MAX_PROFILE_SLOTS)
 end
 
 function BotControl_SaveProfile(profileName)
     local frame = BotControlFrame
-    local db
-    local values
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local profiles
+    local slots
 
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
         return
     end
 
-    if frame then
-        BotControlConfig:SaveFromUI(frame)
+    if frame and frame.fields then
+        slots = BotControl.SaveActiveSlotsFromUI(frame)
+    else
+        slots = BotControl.GetActiveProfileSlots()
     end
 
-    values = BotControl.GetFieldValuesFromUI(frame)
-    if not next(values) then
-        values = {
-            tankName = BotControlConfig:GetValue("tankName"),
-            healName = BotControlConfig:GetValue("healName"),
-            dps1Name = BotControlConfig:GetValue("dps1Name"),
-            dps2Name = BotControlConfig:GetValue("dps2Name"),
-            dps3Name = BotControlConfig:GetValue("dps3Name"),
-            tankRole = BotControlConfig:GetValue("tankRole"),
-            healRole = BotControlConfig:GetValue("healRole"),
-            dps1Role = BotControlConfig:GetValue("dps1Role"),
-            dps2Role = BotControlConfig:GetValue("dps2Role"),
-            dps3Role = BotControlConfig:GetValue("dps3Role"),
-            tankClass = BotControlConfig:GetValue("tankClass"),
-            healClass = BotControlConfig:GetValue("healClass"),
-            dps1Class = BotControlConfig:GetValue("dps1Class"),
-            dps2Class = BotControlConfig:GetValue("dps2Class"),
-            dps3Class = BotControlConfig:GetValue("dps3Class"),
-            tankBuild = BotControlConfig:GetValue("tankBuild"),
-            healBuild = BotControlConfig:GetValue("healBuild"),
-            dps1Build = BotControlConfig:GetValue("dps1Build"),
-            dps2Build = BotControlConfig:GetValue("dps2Build"),
-            dps3Build = BotControlConfig:GetValue("dps3Build")
-        }
-    end
-
-    db = BotControlConfig:GetDB()
-    if type(db.profiles) ~= "table" then
-        db.profiles = {}
-    end
-
-    db.profiles[profileName] = BotControl.BuildProfileFromValues(values)
-    BotControl.SyncGroupsToDB(values)
+    profiles = BotControl.GetProfilesTable(formatKey)
+    profiles[profileName] = BotControl.BuildProfileFromSlots(formatKey, slots)
+    BotControl.selectedProfileNamesByFormat[formatKey] = profileName
     BotControl.selectedProfileName = profileName
+    BotControl_SelectedProfileName = profileName
     BotControl.RefreshProfileList()
 end
 
 function BotControl_LoadProfile(profileName)
     local frame = BotControlFrame
-    local db = BotControlConfig:GetDB()
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local profiles = BotControl.GetProfilesTable(formatKey)
     local profile
-    local values
-    local key
+    local slots
 
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
         return
     end
 
-    if type(db.profiles) ~= "table" then
-        db.profiles = {}
-    end
-
-    profile = db.profiles[profileName]
+    profile = profiles[profileName]
     if type(profile) ~= "table" then
         return
     end
 
-    values = BotControl.BuildValuesFromProfile(profile)
-
-    for key, value in pairs(values) do
-        BotControlConfig:SetValue(key, value)
-    end
-
-    BotControl.SyncGroupsToDB(values)
-    BotControl.ApplyValuesToUI(frame, values)
+    slots = BotControl.BuildSlotsFromProfile(profile, formatKey)
+    BotControl.SetWorkingSlots(formatKey, slots)
+    BotControl.ApplyValuesToUI(frame, BotControl.BuildValuesFromSlots(slots, BotControl.MAX_PROFILE_SLOTS))
+    BotControl.selectedProfileNamesByFormat[formatKey] = profileName
     BotControl.selectedProfileName = profileName
+    BotControl_SelectedProfileName = profileName
     BotControl.RefreshProfileList()
 end
 
 function BotControl_DeleteProfile(profileName)
-    local db = BotControlConfig:GetDB()
+    local formatKey = BotControl.GetActiveProfileFormat()
+    local profiles = BotControl.GetProfilesTable(formatKey)
 
     profileName = BotControl.Trim(profileName or "")
     if not BotControl.HasValue(profileName) then
         return
     end
 
-    if type(db.profiles) ~= "table" then
-        db.profiles = {}
-    end
-
-    if not db.profiles[profileName] then
+    if not profiles[profileName] then
         return
     end
 
-    db.profiles[profileName] = nil
+    profiles[profileName] = nil
     if BotControl.selectedProfileName == profileName then
         BotControl.selectedProfileName = nil
+    end
+    if BotControl.selectedProfileNamesByFormat[formatKey] == profileName then
+        BotControl.selectedProfileNamesByFormat[formatKey] = nil
     end
     BotControl.RefreshProfileList()
 end
@@ -1683,6 +2355,9 @@ function BotControl_LayoutButtons()
     local actionsTabButton = BotControlTabActions
     local configSubTabButton = BotControlActionsSubTabConfig
     local combatSubTabButton = BotControlActionsSubTabCombat
+    local profileSubTab5Button = BotControlProfilesSubTab5
+    local profileSubTab10Button = BotControlProfilesSubTab10
+    local profileSubTab25Button = BotControlProfilesSubTab25
     local namesHeader = BotControlFrameNamesHeader
     local buildsHeader = BotControlFrameBuildsHeader
     local profileNameLabel = BotControlFrameProfileNameLabel
@@ -1708,6 +2383,7 @@ function BotControl_LayoutButtons()
     local iconSpacing = BotControl.ACTIONS_ICON_SPACING
     local rowSpacing = BotControl.ACTIONS_ROW_SPACING
     local actionsAnchor
+    local sidePanelX = BotControl.GetProfileSidePanelX(BotControl.GetActiveProfileFormat())
 
     if not frame then
         return
@@ -1745,28 +2421,53 @@ function BotControl_LayoutButtons()
         end
     end
 
+    if profileSubTab5Button then
+        profileSubTab5Button:ClearAllPoints()
+        profileSubTab5Button:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -60)
+    end
+
+    if profileSubTab10Button then
+        profileSubTab10Button:ClearAllPoints()
+        if profileSubTab5Button then
+            profileSubTab10Button:SetPoint("LEFT", profileSubTab5Button, "RIGHT", 8, 0)
+        else
+            profileSubTab10Button:SetPoint("TOPLEFT", frame, "TOPLEFT", 110, -60)
+        end
+    end
+
+    if profileSubTab25Button then
+        profileSubTab25Button:ClearAllPoints()
+        if profileSubTab10Button then
+            profileSubTab25Button:SetPoint("LEFT", profileSubTab10Button, "RIGHT", 8, 0)
+        elseif profileSubTab5Button then
+            profileSubTab25Button:SetPoint("LEFT", profileSubTab5Button, "RIGHT", 96, 0)
+        else
+            profileSubTab25Button:SetPoint("TOPLEFT", frame, "TOPLEFT", 204, -60)
+        end
+    end
+
     if namesHeader then
         namesHeader:ClearAllPoints()
         namesHeader:SetText("Bots")
-        namesHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -58)
+        namesHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 24, -84)
     end
 
     if buildsHeader then
         buildsHeader:ClearAllPoints()
         buildsHeader:SetText("")
-        buildsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 190, -58)
+        buildsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 190, -84)
     end
 
     if profilesListLabel then
         profilesListLabel:ClearAllPoints()
-        profilesListLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 436, -58)
+        profilesListLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", sidePanelX + 4, -58)
     end
 
     if profilesListFrame then
         profilesListFrame:ClearAllPoints()
         profilesListFrame:SetWidth(138)
         profilesListFrame:SetHeight(160)
-        profilesListFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", 432, -76)
+        profilesListFrame:SetPoint("TOPLEFT", frame, "TOPLEFT", sidePanelX, -76)
     end
 
     if profileNameLabel then
@@ -1965,29 +2666,17 @@ function BotControl_LayoutButtons()
         saveButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 24, 20)
     end
 
+    BotControl.LayoutProfileFields(frame)
+    BotControl.UpdateProfileSubTabs()
+
 end
 
 function BotControl.Save()
-    BotControlConfig:SaveFromUI(BotControlFrame)
-    BotControl.SyncGroupsToDB(BotControl.GetFieldValuesFromUI(BotControlFrame))
+    BotControl.SaveActiveSlotsFromUI(BotControlFrame)
 end
 
 function BotControl.Load()
-    local db = BotControlConfig:GetDB()
-
-    BotControlConfig:LoadToUI(BotControlFrame)
-    BotControl.SyncGroupsToDB({
-        tankName = db.tankName or "",
-        healName = db.healName or "",
-        dps1Name = db.dps1Name or "",
-        dps2Name = db.dps2Name or "",
-        dps3Name = db.dps3Name or "",
-        tankBuild = db.tankBuild or "",
-        healBuild = db.healBuild or "",
-        dps1Build = db.dps1Build or "",
-        dps2Build = db.dps2Build or "",
-        dps3Build = db.dps3Build or ""
-    })
+    BotControl.LoadActiveSlotsToUI(BotControlFrame)
 end
 
 function BotControl.SendChatCommand(commandType, message, target)
@@ -2134,13 +2823,13 @@ function BotControl.HandleEvent()
 
     if event == "ADDON_LOADED" and arg1 == "BotControl" then
         BotControlConfig:Initialize()
-        db = BotControlConfig:GetDB()
-        if type(db.profiles) ~= "table" then
-            db.profiles = {}
-        end
+        BotControl.EnsureProfileStorage()
         BotControl.SetupSlashCommands()
     elseif event == "PLAYER_LOGIN" then
+        db = BotControlConfig:GetDB()
+        BotControl.EnsureProfileStorage()
         BotControl.InitializeFrame(BotControlFrame)
+        BotControl.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
         BotControl_LayoutButtons()
         BotControl.Load()
         BotControl.RefreshProfileList()
@@ -2162,12 +2851,12 @@ function BotControl_OnLoad(frame)
     local db
 
     BotControlConfig:Initialize()
+    BotControl.EnsureProfileStorage()
     db = BotControlConfig:GetDB()
-    if type(db.profiles) ~= "table" then
-        db.profiles = {}
-    end
     BotControl.InitializeFrame(frame)
     BotControl_LayoutButtons()
+    BotControl.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
+    BotControl.Load()
     BotControl.RefreshProfileList()
     BotControl_UpdateFrameSizeForView("Profiles")
     frame:SetScript("OnShow", BotControl.OnFrameShow)

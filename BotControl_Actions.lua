@@ -81,73 +81,198 @@ local function AddSlash(commands, command)
     end
 end
 
-local function BuildRoleSlot(name, roleName, buildName, fallbackRole)
-    return {
-        name = BotControl.Trim(name or ""),
-        role = BotControl.NormalizeRole(roleName, fallbackRole),
-        build = BotControl.Trim(buildName or "")
-    }
-end
-
-local function ResolveConfigByRole(db)
-    local cfg = {}
-    local slots = {
-        BuildRoleSlot(db.tankName, db.tankRole, db.tankBuild, "tank"),
-        BuildRoleSlot(db.healName, db.healRole, db.healBuild, "heal"),
-        BuildRoleSlot(db.dps1Name, db.dps1Role, db.dps1Build, "dps"),
-        BuildRoleSlot(db.dps2Name, db.dps2Role, db.dps2Build, "dps"),
-        BuildRoleSlot(db.dps3Name, db.dps3Role, db.dps3Build, "dps")
-    }
-    local dpsSlots = {}
+local function AddUniqueName(target, name)
     local index
-    local slot
 
-    for index = 1, table.getn(slots) do
-        slot = slots[index]
+    if not BotControl.HasValue(name) then
+        return
+    end
 
-        if slot.role == "tank" then
-            if not BotControl.HasValue(cfg.tankName) then
-                cfg.tankName = slot.name
-                cfg.tankBuild = slot.build
-            end
-        elseif slot.role == "heal" then
-            if not BotControl.HasValue(cfg.healName) then
-                cfg.healName = slot.name
-                cfg.healBuild = slot.build
-            end
-        elseif BotControl.HasValue(slot.name) or BotControl.HasValue(slot.build) then
-            table.insert(dpsSlots, slot)
+    for index = 1, table.getn(target) do
+        if target[index] == name then
+            return
         end
     end
 
-    cfg.dps1Name = dpsSlots[1] and dpsSlots[1].name or ""
-    cfg.dps1Build = dpsSlots[1] and dpsSlots[1].build or ""
-    cfg.dps2Name = dpsSlots[2] and dpsSlots[2].name or ""
-    cfg.dps2Build = dpsSlots[2] and dpsSlots[2].build or ""
-    cfg.dps3Name = dpsSlots[3] and dpsSlots[3].name or ""
-    cfg.dps3Build = dpsSlots[3] and dpsSlots[3].build or ""
+    table.insert(target, name)
+end
 
-    cfg.tankName = cfg.tankName or ""
-    cfg.tankBuild = cfg.tankBuild or ""
-    cfg.healName = cfg.healName or ""
-    cfg.healBuild = cfg.healBuild or ""
+local function AddWhisperList(commands, names, message)
+    local index
+
+    for index = 1, table.getn(names) do
+        AddWhisper(commands, names[index], message)
+    end
+end
+
+local function BuildActionConfig()
+    local cfg = {
+        slots = BotControl.GetActiveProfileSlots(),
+        namedSlots = {},
+        names = {},
+        roleSlots = {
+            tank = {},
+            heal = {},
+            dps = {}
+        },
+        roleNames = {
+            tank = {},
+            heal = {},
+            dps = {}
+        }
+    }
+    local normalizedSlots = BotControl.NormalizeSlotsList(cfg.slots, table.getn(cfg.slots or {}))
+    local index
+    local slot
+
+    for index = 1, table.getn(normalizedSlots) do
+        slot = normalizedSlots[index]
+        if BotControl.HasValue(slot.name) then
+            table.insert(cfg.namedSlots, slot)
+            table.insert(cfg.roleSlots[slot.role], slot)
+            AddUniqueName(cfg.names, slot.name)
+            AddUniqueName(cfg.roleNames[slot.role], slot.name)
+        end
+    end
+
+    cfg.tankName = cfg.roleNames.tank[1] or ""
+    cfg.healName = cfg.roleNames.heal[1] or ""
+    cfg.dps1Name = cfg.roleNames.dps[1] or ""
+    cfg.dps2Name = cfg.roleNames.dps[2] or ""
+    cfg.dps3Name = cfg.roleNames.dps[3] or ""
+
+    cfg.tankBuild = cfg.roleSlots.tank[1] and cfg.roleSlots.tank[1].spec or ""
+    cfg.healBuild = cfg.roleSlots.heal[1] and cfg.roleSlots.heal[1].spec or ""
+    cfg.dps1Build = cfg.roleSlots.dps[1] and cfg.roleSlots.dps[1].spec or ""
+    cfg.dps2Build = cfg.roleSlots.dps[2] and cfg.roleSlots.dps[2].spec or ""
+    cfg.dps3Build = cfg.roleSlots.dps[3] and cfg.roleSlots.dps[3].spec or ""
 
     return cfg
 end
 
+local function CopyCommand(command)
+    local copy = {}
+    local key
+    local value
+
+    if type(command) ~= "table" then
+        return command
+    end
+
+    for key, value in pairs(command) do
+        copy[key] = value
+    end
+
+    return copy
+end
+
+local function ReplaceRoleTokenInText(text, roleName, replacement)
+    if type(text) ~= "string" then
+        return text
+    end
+
+    return string.gsub(text, "%{" .. roleName .. "%}", replacement)
+end
+
+local function CommandContainsRoleToken(command, roleName)
+    local token = "{" .. roleName .. "}"
+    local key
+    local value
+
+    if type(command) == "string" then
+        return string.find(command, token, 1, true) ~= nil
+    end
+
+    if type(command) ~= "table" then
+        return false
+    end
+
+    for key, value in pairs(command) do
+        if type(value) == "string" and string.find(value, token, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function ReplaceRoleTokenInCommand(command, roleName, replacement)
+    local key
+    local value
+    local copy
+
+    if type(command) == "string" then
+        return ReplaceRoleTokenInText(command, roleName, replacement)
+    end
+
+    if type(command) ~= "table" then
+        return command
+    end
+
+    copy = CopyCommand(command)
+    for key, value in pairs(copy) do
+        if type(value) == "string" then
+            copy[key] = ReplaceRoleTokenInText(value, roleName, replacement)
+        end
+    end
+
+    return copy
+end
+
+local function ExpandCommandsForRole(commands, cfg, roleName)
+    local expanded = {}
+    local names = cfg.roleNames[roleName] or {}
+    local index
+    local nameIndex
+    local command
+
+    for index = 1, table.getn(commands) do
+        command = commands[index]
+        if CommandContainsRoleToken(command, roleName) then
+            for nameIndex = 1, table.getn(names) do
+                table.insert(expanded, ReplaceRoleTokenInCommand(command, roleName, names[nameIndex]))
+            end
+        else
+            table.insert(expanded, command)
+        end
+    end
+
+    return expanded
+end
+
+local function ExpandCommandsByRoleTokens(commands, cfg)
+    local expanded = commands
+    local index
+    local roleName
+
+    for index = 1, table.getn(BotControl.Roles) do
+        roleName = BotControl.Roles[index]
+        expanded = ExpandCommandsForRole(expanded, cfg, roleName)
+    end
+
+    return expanded
+end
+
 function BotControlActions:GetConfig()
-    return ResolveConfigByRole(BotControlConfig:GetDB())
+    return BuildActionConfig()
+end
+
+function BotControlActions:PrepareCommands(commands)
+    return ExpandCommandsByRoleTokens(commands or {}, self:GetConfig())
 end
 
 function BotControlActions:BuildCommands()
     local cfg = self:GetConfig()
     local commands = {}
+    local index
+    local slot
 
-    AddWhisper(commands, cfg.tankName, "talents " .. cfg.tankBuild)
-    AddWhisper(commands, cfg.healName, "talents " .. cfg.healBuild)
-    AddWhisper(commands, cfg.dps1Name, "talents " .. cfg.dps1Build)
-    AddWhisper(commands, cfg.dps2Name, "talents " .. cfg.dps2Build)
-    AddWhisper(commands, cfg.dps3Name, "talents " .. cfg.dps3Build)
+    for index = 1, table.getn(cfg.namedSlots) do
+        slot = cfg.namedSlots[index]
+        if BotControl.HasValue(slot.spec) then
+            AddWhisper(commands, slot.name, "talents " .. slot.spec)
+        end
+    end
 
     return commands
 end
@@ -162,11 +287,9 @@ function BotControlActions:InitCommands()
     AddParty(commands, "nc -loot")
     AddParty(commands, "nc +passive")
 
-    AddWhisper(commands, cfg.tankName, "stance tank")
-    AddWhisper(commands, cfg.healName, "co +wait for attack")
-    AddWhisper(commands, cfg.dps1Name, "co +wait for attack")
-    AddWhisper(commands, cfg.dps2Name, "co +wait for attack")
-    AddWhisper(commands, cfg.dps3Name, "co +wait for attack")
+    AddWhisperList(commands, cfg.roleNames.tank, "stance tank")
+    AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
+    AddWhisperList(commands, cfg.roleNames.dps, "co +wait for attack")
 
     return commands
 end
@@ -174,19 +297,10 @@ end
 function BotControlActions:SummonCommands()
     local cfg = self:GetConfig()
     local commands = {}
-    local names = {
-        cfg.tankName,
-        cfg.healName,
-        cfg.dps1Name,
-        cfg.dps2Name,
-        cfg.dps3Name
-    }
     local index
-    local name
 
-    for index = 1, table.getn(names) do
-        name = names[index]
-        AddWhisper(commands, name, "summon")
+    for index = 1, table.getn(cfg.names) do
+        AddWhisper(commands, cfg.names[index], "summon")
     end
 
     return commands
@@ -196,11 +310,9 @@ function BotControlActions:TankAttackCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
-    AddWhisper(commands, cfg.tankName, "attack")
-    AddWhisper(commands, cfg.healName, "wait for attack time 1")
-    AddWhisper(commands, cfg.dps1Name, "wait for attack time 10")
-    AddWhisper(commands, cfg.dps2Name, "wait for attack time 10")
-    AddWhisper(commands, cfg.dps3Name, "wait for attack time 10")
+    AddWhisperList(commands, cfg.roleNames.tank, "attack")
+    AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
+    AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 10")
 
     return commands
 end
@@ -208,18 +320,8 @@ end
 function BotControlActions:AttackDPSCommands()
     local cfg = self:GetConfig()
     local commands = {}
-    local dpsNames = {
-        cfg.dps1Name,
-        cfg.dps2Name,
-        cfg.dps3Name
-    }
-    local index
-    local name
 
-    for index = 1, table.getn(dpsNames) do
-        name = dpsNames[index]
-        AddWhisper(commands, name, "attack")
-    end
+    AddWhisperList(commands, cfg.roleNames.dps, "attack")
 
     return commands
 end
@@ -260,24 +362,15 @@ end
 function BotControlActions:InitBotsCommands()
     local cfg = self:GetConfig()
     local commands = {}
-    local names = {
-        cfg.tankName,
-        cfg.healName,
-        cfg.dps1Name,
-        cfg.dps2Name,
-        cfg.dps3Name
-    }
     local index
     local name
 
-    for index = 1, table.getn(names) do
-        name = names[index]
-        if BotControl.HasValue(name) then
-            AddSlash(commands, ".bot init " .. name)
-            AddSlash(commands, ".bot learn " .. name)
-            AddSlash(commands, ".bot gear " .. name)
-            AddSlash(commands, ".bot prepare " .. name)
-        end
+    for index = 1, table.getn(cfg.names) do
+        name = cfg.names[index]
+        AddSlash(commands, ".bot init " .. name)
+        AddSlash(commands, ".bot learn " .. name)
+        AddSlash(commands, ".bot gear " .. name)
+        AddSlash(commands, ".bot prepare " .. name)
     end
 
     return commands
@@ -286,33 +379,21 @@ end
 function BotControlActions:ComposeGroupCommands()
     local cfg = self:GetConfig()
     local commands = {}
-    local names = {
-        cfg.tankName,
-        cfg.healName,
-        cfg.dps1Name,
-        cfg.dps2Name,
-        cfg.dps3Name
-    }
     local index
     local name
 
-    for index = 1, table.getn(names) do
-        name = names[index]
-        if BotControl.HasValue(name) then
-            AddSlash(commands, ".bot add " .. name)
-        end
+    for index = 1, table.getn(cfg.names) do
+        name = cfg.names[index]
+        AddSlash(commands, ".bot add " .. name)
     end
 
-    for index = 1, table.getn(names) do
-        name = names[index]
-        AddWhisper(commands, name, "leave group")
+    for index = 1, table.getn(cfg.names) do
+        AddWhisper(commands, cfg.names[index], "leave group")
     end
 
-    for index = 1, table.getn(names) do
-        name = names[index]
-        if BotControl.HasValue(name) then
-            AddSlash(commands, "/invite " .. name)
-        end
+    for index = 1, table.getn(cfg.names) do
+        name = cfg.names[index]
+        AddSlash(commands, "/invite " .. name)
     end
 
     return commands
@@ -328,7 +409,7 @@ function BotControlActions:RunAction(actionKey)
     end
 
     commands = self[definition.builder](self)
-    BotControl.RunCommands(commands)
+    BotControl.RunCommands(self:PrepareCommands(commands))
 end
 
 function BotControl_Action_Build()
@@ -354,7 +435,7 @@ function BotControl_Action_InitBots()
 
     if BotControlActions and BotControlActions.InitBotsCommands and BotControl.RunCommandsQueued then
         commands = BotControlActions:InitBotsCommands()
-        BotControl.RunCommandsQueued(commands)
+        BotControl.RunCommandsQueued(BotControlActions:PrepareCommands(commands))
     end
 end
 

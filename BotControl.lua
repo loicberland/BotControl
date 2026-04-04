@@ -98,7 +98,7 @@ BotControl.ACTION_BUTTON_CONFIG = {
         description = "Applique les talents aux bots configures"
     },
     Init = {
-        texture = "Interface\\Icons\\INV_Misc_Gear_01",
+        texture = "Interface\\Icons\\INV_Misc_Book_09",
         title = "Initialiser",
         description = "Applique la configuration de base des bots"
     },
@@ -2052,16 +2052,6 @@ function BotControl.CreateButtons(frame)
         end)
     end
 
-    if not BotControlFullSetupButton then
-        fullSetupButton = CreateFrame("Button", "BotControlFullSetupButton", frame, "UIPanelButtonTemplate")
-        fullSetupButton:SetText("Full setup")
-        fullSetupButton:SetWidth(140)
-        fullSetupButton:SetHeight(24)
-        fullSetupButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("FullSetup")
-        end)
-    end
-
     if not BotControlInitBotsButton then
         initBotsButton = CreateFrame("Button", "BotControlInitBotsButton", frame, "UIPanelButtonTemplate")
         initBotsButton:SetText("Init bots")
@@ -2607,31 +2597,28 @@ function BotControl_LayoutButtons()
             end
         end
 
+        if initBotsButton then
+            initBotsButton:ClearAllPoints()
+            if buildButton then
+                initBotsButton:SetPoint("LEFT", buildButton, "RIGHT", iconSpacing, 0)
+            end
+        end
+
         if initButton then
             initButton:ClearAllPoints()
-            if buildButton then
-                initButton:SetPoint("LEFT", buildButton, "RIGHT", iconSpacing, 0)
+            if initBotsButton then
+                initButton:SetPoint("LEFT", initBotsButton, "RIGHT", iconSpacing, 0)
             end
         end
 
         if fullSetupButton then
             fullSetupButton:ClearAllPoints()
-            if composeGroupButton then
-                fullSetupButton:SetPoint("TOPLEFT", composeGroupButton, "BOTTOMLEFT", 0, -rowSpacing)
-            end
         end
 
         if summonButton then
             summonButton:ClearAllPoints()
-            if fullSetupButton then
-                summonButton:SetPoint("LEFT", fullSetupButton, "RIGHT", iconSpacing, 0)
-            end
-        end
-
-        if initBotsButton then
-            initBotsButton:ClearAllPoints()
-            if summonButton then
-                initBotsButton:SetPoint("LEFT", summonButton, "RIGHT", iconSpacing, 0)
+            if composeGroupButton then
+                summonButton:SetPoint("TOPLEFT", composeGroupButton, "BOTTOMLEFT", 0, -rowSpacing)
             end
         end
 

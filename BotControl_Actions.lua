@@ -285,11 +285,18 @@ function BotControlActions:InitCommands()
     AddParty(commands, "stance near")
     AddParty(commands, "rti cc none")
     AddParty(commands, "nc -loot")
-    AddParty(commands, "nc +passive")
+    -- AddParty(commands, "nc +passive")
+    -- AddParty(commands, "co -passive")
+    AddParty(commands, "save mana 2")
+    AddParty(commands, "follow")
+    AddParty(commands, "co -cc")
 
     AddWhisperList(commands, cfg.roleNames.tank, "stance tank")
+    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti")
     AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
+    AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
     AddWhisperList(commands, cfg.roleNames.dps, "co +wait for attack")
+    AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 5")
 
     return commands
 end
@@ -299,9 +306,10 @@ function BotControlActions:SummonCommands()
     local commands = {}
     local index
 
-    for index = 1, table.getn(cfg.names) do
-        AddWhisper(commands, cfg.names[index], "summon")
-    end
+    AddParty(commands, "summon")
+    -- for index = 1, table.getn(cfg.names) do
+    --     AddWhisper(commands, cfg.names[index], "summon")
+    -- end
 
     return commands
 end
@@ -367,10 +375,16 @@ function BotControlActions:InitBotsCommands()
 
     for index = 1, table.getn(cfg.names) do
         name = cfg.names[index]
+        AddWhisper(commands, cfg.names[index], "reset ai")
         AddSlash(commands, ".bot init " .. name)
         AddSlash(commands, ".bot learn " .. name)
         AddSlash(commands, ".bot gear " .. name)
         AddSlash(commands, ".bot prepare " .. name)
+        AddSlash(commands, ".bot reagents " .. name)
+        AddSlash(commands, ".bot consumables " .. name)
+        AddSlash(commands, ".bot enchants " .. name)
+        AddSlash(commands, ".bot food " .. name)
+        AddSlash(commands, ".bot potions " .. name)
     end
 
     return commands

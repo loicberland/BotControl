@@ -4,6 +4,7 @@ BotControl_ActionElements = {}
 BotControl_ActionSubTabElements = {}
 BotControl_ActionConfigElements = {}
 BotControl_ActionCombatElements = {}
+BotControl_ActionCombatDecorElements = {}
 BotControl.selectedProfileName = nil
 BotControl.selectedProfileNamesByFormat = {}
 BotControl_SelectedProfileName = nil
@@ -14,12 +15,13 @@ BotControl.activeProfileFormat = "party5"
 BotControl.PROFILES_FRAME_WIDTH = 595
 BotControl.PROFILES_FRAME_HEIGHT = 350
 BotControl.ACTIONS_CONFIG_FRAME_WIDTH = 400
-BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 360
+BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 560
 BotControl.ACTIONS_BASE_HEIGHT = 146
 BotControl.ACTIONS_ICON_SIZE = 36
 BotControl.ACTIONS_ICON_SPACING = 12
 BotControl.ACTIONS_ROW_SPACING = 16
 BotControl.ACTIONS_ICONS_PER_ROW = 3
+BotControl.ACTIONS_COMBAT_MIN_ROWS = 4
 BotControl.COMMAND_INTERVAL = 0.15
 BotControl.commandQueue = {}
 BotControl.MAX_PROFILE_SLOTS = 25
@@ -137,6 +139,11 @@ BotControl.ACTION_BUTTON_CONFIG = {
         title = "Passif",
         description = "Ordonne au groupe de fuir / se desengager"
     },
+    PassiveDPS = {
+        texture = "Interface\\Icons\\Ability_Rogue_FeignDeath",
+        title = "Passif DPS",
+        description = "Ordonne uniquement aux DPS de fuir / se desengager"
+    },
     Stay = {
         texture = "Interface\\Icons\\Spell_Nature_TimeStop",
         title = "Rester sur place",
@@ -160,6 +167,7 @@ BotControl.ACTION_COMMAND_ORDER = {
     "AttackDPS",
     "Follow",
     "Passive",
+    "PassiveDPS",
     "Stay",
     "Used"
 }
@@ -194,6 +202,10 @@ BotControl.ACTION_COMMAND_ALIASES = {
     },
     Passive = {
         "passive"
+    },
+    PassiveDPS = {
+        "passivedps",
+        "passive dps"
     },
     Stay = {
         "stay"
@@ -1446,6 +1458,9 @@ function BotControl_UpdateFrameSizeForView(mainTab, subTab)
         end
 
         rows = math.ceil(iconCount / BotControl.ACTIONS_ICONS_PER_ROW)
+        if subTab == "Combat" and rows < BotControl.ACTIONS_COMBAT_MIN_ROWS then
+            rows = BotControl.ACTIONS_COMBAT_MIN_ROWS
+        end
         height = BotControl.ACTIONS_BASE_HEIGHT + (rows * (BotControl.ACTIONS_ICON_SIZE + BotControl.ACTIONS_ROW_SPACING))
     end
 
@@ -1832,6 +1847,9 @@ function BotControl.StyleActionButtons()
     config = BotControl.ACTION_BUTTON_CONFIG.Passive
     BotControl_SetActionButtonIcon(BotControlPassiveButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Passive"))
 
+    config = BotControl.ACTION_BUTTON_CONFIG.PassiveDPS
+    BotControl_SetActionButtonIcon(BotControlPassiveDPSButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("PassiveDPS"))
+
     config = BotControl.ACTION_BUTTON_CONFIG.Stay
     BotControl_SetActionButtonIcon(BotControlStayButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Stay"))
 
@@ -1867,6 +1885,7 @@ function BotControl.RegisterTabElements(frame)
     BotControl_ActionSubTabElements = {}
     BotControl_ActionConfigElements = {}
     BotControl_ActionCombatElements = {}
+    BotControl_ActionCombatDecorElements = {}
 
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameNamesHeader)
     BotControl.AddElement(BotControl_ProfileElements, BotControlFrameBuildsHeader)
@@ -1919,8 +1938,16 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ActionElements, BotControlAttackDPSButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlFollowButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlPassiveButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlPassiveDPSButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlStayButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlUsedButton)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatTankHeader)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatDPSHeader)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatHealHeader)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatAllHeader)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatSeparator1)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatSeparator2)
+    BotControl.AddElement(BotControl_ActionElements, BotControlCombatSeparator3)
     BotControl.AddElement(BotControl_ActionElements, BotControlActionsSubTabConfig)
     BotControl.AddElement(BotControl_ActionElements, BotControlActionsSubTabCombat)
 
@@ -1938,8 +1965,17 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ActionCombatElements, BotControlAttackDPSButton)
     BotControl.AddElement(BotControl_ActionCombatElements, BotControlFollowButton)
     BotControl.AddElement(BotControl_ActionCombatElements, BotControlPassiveButton)
+    BotControl.AddElement(BotControl_ActionCombatElements, BotControlPassiveDPSButton)
     BotControl.AddElement(BotControl_ActionCombatElements, BotControlStayButton)
     BotControl.AddElement(BotControl_ActionCombatElements, BotControlUsedButton)
+
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatTankHeader)
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatDPSHeader)
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatHealHeader)
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatAllHeader)
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatSeparator1)
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatSeparator2)
+    BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatSeparator3)
 end
 
 function BotControl_ShowActionsSubTab(tabName)
@@ -1973,9 +2009,23 @@ function BotControl_ShowActionsSubTab(tabName)
                 element:Show()
             end
         end
+
+        for index = 1, table.getn(BotControl_ActionCombatDecorElements) do
+            element = BotControl_ActionCombatDecorElements[index]
+            if element then
+                element:Show()
+            end
+        end
     else
         for index = 1, table.getn(BotControl_ActionCombatElements) do
             element = BotControl_ActionCombatElements[index]
+            if element then
+                element:Hide()
+            end
+        end
+
+        for index = 1, table.getn(BotControl_ActionCombatDecorElements) do
+            element = BotControl_ActionCombatDecorElements[index]
             if element then
                 element:Hide()
             end
@@ -2062,6 +2112,7 @@ function BotControl.CreateButtons(frame)
     local attackDpsButton
     local followButton
     local passiveButton
+    local passiveDpsButton
     local stayButton
     local usedButton
     local saveProfileButton
@@ -2069,6 +2120,13 @@ function BotControl.CreateButtons(frame)
     local deleteProfileButton
     local configSubTabButton
     local combatSubTabButton
+    local combatTankHeader
+    local combatDpsHeader
+    local combatHealHeader
+    local combatAllHeader
+    local combatSeparator1
+    local combatSeparator2
+    local combatSeparator3
     local profileSubTab5Button
     local profileSubTab10Button
     local profileSubTab25Button
@@ -2121,6 +2179,48 @@ function BotControl.CreateButtons(frame)
         combatSubTabButton:SetScript("OnClick", function()
             BotControl_ShowActionsSubTab("Combat")
         end)
+    end
+
+    if not BotControlCombatTankHeader then
+        combatTankHeader = frame:CreateFontString("BotControlCombatTankHeader", "OVERLAY", "GameFontNormal")
+        combatTankHeader:SetJustifyH("CENTER")
+        combatTankHeader:SetText("Tank")
+    end
+
+    if not BotControlCombatDPSHeader then
+        combatDpsHeader = frame:CreateFontString("BotControlCombatDPSHeader", "OVERLAY", "GameFontNormal")
+        combatDpsHeader:SetJustifyH("CENTER")
+        combatDpsHeader:SetText("DPS")
+    end
+
+    if not BotControlCombatHealHeader then
+        combatHealHeader = frame:CreateFontString("BotControlCombatHealHeader", "OVERLAY", "GameFontNormal")
+        combatHealHeader:SetJustifyH("CENTER")
+        combatHealHeader:SetText("Heal")
+    end
+
+    if not BotControlCombatAllHeader then
+        combatAllHeader = frame:CreateFontString("BotControlCombatAllHeader", "OVERLAY", "GameFontNormal")
+        combatAllHeader:SetJustifyH("CENTER")
+        combatAllHeader:SetText("All")
+    end
+
+    if not BotControlCombatSeparator1 then
+        combatSeparator1 = frame:CreateTexture("BotControlCombatSeparator1", "ARTWORK")
+        combatSeparator1:SetTexture(1, 1, 1, 0.18)
+        combatSeparator1:SetWidth(1)
+    end
+
+    if not BotControlCombatSeparator2 then
+        combatSeparator2 = frame:CreateTexture("BotControlCombatSeparator2", "ARTWORK")
+        combatSeparator2:SetTexture(1, 1, 1, 0.18)
+        combatSeparator2:SetWidth(1)
+    end
+
+    if not BotControlCombatSeparator3 then
+        combatSeparator3 = frame:CreateTexture("BotControlCombatSeparator3", "ARTWORK")
+        combatSeparator3:SetTexture(1, 1, 1, 0.18)
+        combatSeparator3:SetWidth(1)
     end
 
     if not BotControlProfilesSubTab5 then
@@ -2190,6 +2290,16 @@ function BotControl.CreateButtons(frame)
         passiveButton:SetHeight(24)
         passiveButton:SetScript("OnClick", function()
             BotControl_RunNamedAction("Passive")
+        end)
+    end
+
+    if not BotControlPassiveDPSButton then
+        passiveDpsButton = CreateFrame("Button", "BotControlPassiveDPSButton", frame, "UIPanelButtonTemplate")
+        passiveDpsButton:SetText("Passif DPS")
+        passiveDpsButton:SetWidth(110)
+        passiveDpsButton:SetHeight(24)
+        passiveDpsButton:SetScript("OnClick", function()
+            BotControl_RunNamedAction("PassiveDPS")
         end)
     end
 
@@ -2446,6 +2556,13 @@ function BotControl_LayoutButtons()
     local actionsTabButton = BotControlTabActions
     local configSubTabButton = BotControlActionsSubTabConfig
     local combatSubTabButton = BotControlActionsSubTabCombat
+    local combatTankHeader = BotControlCombatTankHeader
+    local combatDpsHeader = BotControlCombatDPSHeader
+    local combatHealHeader = BotControlCombatHealHeader
+    local combatAllHeader = BotControlCombatAllHeader
+    local combatSeparator1 = BotControlCombatSeparator1
+    local combatSeparator2 = BotControlCombatSeparator2
+    local combatSeparator3 = BotControlCombatSeparator3
     local profileSubTab5Button = BotControlProfilesSubTab5
     local profileSubTab10Button = BotControlProfilesSubTab10
     local profileSubTab25Button = BotControlProfilesSubTab25
@@ -2468,6 +2585,7 @@ function BotControl_LayoutButtons()
     local attackDpsButton = BotControlAttackDPSButton
     local followButton = BotControlFollowButton
     local passiveButton = BotControlPassiveButton
+    local passiveDpsButton = BotControlPassiveDPSButton
     local stayButton = BotControlStayButton
     local usedButton = BotControlUsedButton
     local saveButton = BotControlFrameSaveButton
@@ -2475,6 +2593,12 @@ function BotControl_LayoutButtons()
     local rowSpacing = BotControl.ACTIONS_ROW_SPACING
     local actionsAnchor
     local sidePanelX = BotControl.GetProfileSidePanelX(BotControl.GetActiveProfileFormat())
+    local combatColumnLeft = 20
+    local combatColumnWidth = 130
+    local combatHeaderY = -92
+    local combatButtonStartY = -120
+    local combatSeparatorTop = -86
+    local combatSeparatorBottom = 22
 
     if not frame then
         return
@@ -2619,48 +2743,81 @@ function BotControl_LayoutButtons()
     end
 
     if BotControl.currentTab == "Actions" and BotControl.currentActionsSubTab == "Combat" then
+        if combatTankHeader then
+            combatTankHeader:ClearAllPoints()
+            combatTankHeader:SetWidth(combatColumnWidth)
+            combatTankHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft, combatHeaderY)
+        end
+
+        if combatDpsHeader then
+            combatDpsHeader:ClearAllPoints()
+            combatDpsHeader:SetWidth(combatColumnWidth)
+            combatDpsHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft + combatColumnWidth, combatHeaderY)
+        end
+
+        if combatHealHeader then
+            combatHealHeader:ClearAllPoints()
+            combatHealHeader:SetWidth(combatColumnWidth)
+            combatHealHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 2), combatHeaderY)
+        end
+
+        if combatAllHeader then
+            combatAllHeader:ClearAllPoints()
+            combatAllHeader:SetWidth(combatColumnWidth)
+            combatAllHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 3), combatHeaderY)
+        end
+
+        if combatSeparator1 then
+            combatSeparator1:ClearAllPoints()
+            combatSeparator1:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft + combatColumnWidth, combatSeparatorTop)
+            combatSeparator1:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", combatColumnLeft + combatColumnWidth, combatSeparatorBottom)
+        end
+
+        if combatSeparator2 then
+            combatSeparator2:ClearAllPoints()
+            combatSeparator2:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 2), combatSeparatorTop)
+            combatSeparator2:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", combatColumnLeft + (combatColumnWidth * 2), combatSeparatorBottom)
+        end
+
+        if combatSeparator3 then
+            combatSeparator3:ClearAllPoints()
+            combatSeparator3:SetPoint("TOPLEFT", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 3), combatSeparatorTop)
+            combatSeparator3:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", combatColumnLeft + (combatColumnWidth * 3), combatSeparatorBottom)
+        end
+
         if tankAttackButton then
             tankAttackButton:ClearAllPoints()
-            if actionsAnchor then
-                tankAttackButton:SetPoint("TOPLEFT", actionsAnchor, "BOTTOMLEFT", 0, -24)
-            else
-                tankAttackButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -104)
-            end
+            tankAttackButton:SetPoint("TOP", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 0.5), combatButtonStartY)
         end
 
         if attackDpsButton then
             attackDpsButton:ClearAllPoints()
-            if tankAttackButton then
-                attackDpsButton:SetPoint("LEFT", tankAttackButton, "RIGHT", iconSpacing, 0)
-            end
+            attackDpsButton:SetPoint("TOP", frame, "TOPLEFT", combatColumnLeft + combatColumnWidth + (combatColumnWidth * 0.5), combatButtonStartY)
         end
 
         if followButton then
             followButton:ClearAllPoints()
-            if attackDpsButton then
-                followButton:SetPoint("LEFT", attackDpsButton, "RIGHT", iconSpacing, 0)
-            end
+            followButton:SetPoint("TOP", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 3) + (combatColumnWidth * 0.5), combatButtonStartY)
         end
 
         if passiveButton then
             passiveButton:ClearAllPoints()
-            if tankAttackButton then
-                passiveButton:SetPoint("TOPLEFT", tankAttackButton, "BOTTOMLEFT", 0, -rowSpacing)
-            end
+            passiveButton:SetPoint("TOP", followButton, "BOTTOM", 0, -rowSpacing)
+        end
+
+        if passiveDpsButton then
+            passiveDpsButton:ClearAllPoints()
+            passiveDpsButton:SetPoint("TOP", attackDpsButton, "BOTTOM", 0, -rowSpacing)
         end
 
         if stayButton then
             stayButton:ClearAllPoints()
-            if passiveButton then
-                stayButton:SetPoint("LEFT", passiveButton, "RIGHT", iconSpacing, 0)
-            end
+            stayButton:SetPoint("TOP", passiveButton, "BOTTOM", 0, -rowSpacing)
         end
 
         if usedButton then
             usedButton:ClearAllPoints()
-            if stayButton then
-                usedButton:SetPoint("LEFT", stayButton, "RIGHT", iconSpacing, 0)
-            end
+            usedButton:SetPoint("TOP", stayButton, "BOTTOM", 0, -rowSpacing)
         end
 
         if composeGroupButton then
@@ -2682,6 +2839,28 @@ function BotControl_LayoutButtons()
             initBotsButton:ClearAllPoints()
         end
     else
+        if combatTankHeader then
+            combatTankHeader:ClearAllPoints()
+        end
+        if combatDpsHeader then
+            combatDpsHeader:ClearAllPoints()
+        end
+        if combatHealHeader then
+            combatHealHeader:ClearAllPoints()
+        end
+        if combatAllHeader then
+            combatAllHeader:ClearAllPoints()
+        end
+        if combatSeparator1 then
+            combatSeparator1:ClearAllPoints()
+        end
+        if combatSeparator2 then
+            combatSeparator2:ClearAllPoints()
+        end
+        if combatSeparator3 then
+            combatSeparator3:ClearAllPoints()
+        end
+
         if composeGroupButton then
             composeGroupButton:ClearAllPoints()
             if actionsAnchor then
@@ -2734,6 +2913,9 @@ function BotControl_LayoutButtons()
         end
         if passiveButton then
             passiveButton:ClearAllPoints()
+        end
+        if passiveDpsButton then
+            passiveDpsButton:ClearAllPoints()
         end
         if stayButton then
             stayButton:ClearAllPoints()

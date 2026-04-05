@@ -73,8 +73,16 @@ Sous-onglet `Combat` :
 - `AttackDPS`
 - `Follow`
 - `Passive`
+- `PassiveDPS`
 - `Stay`
 - `Used`
+
+Presentation actuelle du sous-onglet `Combat` :
+
+- colonne `Tank` : actions qui ciblent le tank
+- colonne `DPS` : actions qui ciblent les DPS
+- colonne `Heal` : reservee aux actions de soin
+- colonne `All` : actions generales pour tout le groupe
 
 Les icones et tooltips de ces boutons sont decrits dans `BotControl.ACTION_BUTTON_CONFIG` dans `BotControl.lua`.
 
@@ -112,6 +120,7 @@ Avec un argument, il tente d'executer une action :
 - `/bc attackdps`
 - `/bc follow`
 - `/bc passive`
+- `/bc passivedps`
 - `/bc stay`
 - `/bc used`
 

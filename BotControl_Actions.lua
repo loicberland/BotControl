@@ -37,6 +37,10 @@ BotControlActions.definitions = {
         label = "Passive",
         builder = "PassiveCommands"
     },
+    PassiveDPS = {
+        label = "Passive DPS",
+        builder = "PassiveDPSCommands"
+    },
     Stay = {
         label = "Stay",
         builder = "StayCommands"
@@ -347,6 +351,15 @@ function BotControlActions:PassiveCommands()
     local commands = {}
 
     AddParty(commands, "flee")
+
+    return commands
+end
+
+function BotControlActions:PassiveDPSCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.dps, "flee")
 
     return commands
 end

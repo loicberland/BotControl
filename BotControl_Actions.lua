@@ -293,10 +293,10 @@ function BotControlActions:InitCommands()
 
     AddWhisperList(commands, cfg.roleNames.tank, "stance tank")
     AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti")
-    AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
-    AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
-    AddWhisperList(commands, cfg.roleNames.dps, "co +wait for attack")
-    AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 5")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "co +wait for attack")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 5")
 
     return commands
 end

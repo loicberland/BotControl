@@ -80,14 +80,61 @@ Les icones et tooltips de ces boutons sont decrits dans `BotControl.ACTION_BUTTO
 
 ## Flux actuel d'une action
 
-Quand on clique sur un bouton d'action :
+Quand on clique sur un bouton d'action ou qu'on tape une commande slash comme `/bc build` :
 
-1. le bouton appelle `BotControl_RunNamedAction("ActionName")`
-2. sauf cas special, `BotControlActions:RunAction(actionName)` est appele
-3. `BotControl_Actions.lua` cherche l'action dans `BotControlActions.definitions`
-4. la fonction `...Commands()` correspondante construit une liste de commandes
-5. `PrepareCommands()` developpe les variables de role si besoin
-6. les commandes sont executees
+1. le bouton ou la slash command resolvent un nom d'action interne
+2. `BotControl_RunNamedAction("ActionName")` est appele
+3. sauf cas special, `BotControlActions:RunAction(actionName)` est appele
+4. `BotControl_Actions.lua` cherche l'action dans `BotControlActions.definitions`
+5. la fonction `...Commands()` correspondante construit une liste de commandes
+6. `PrepareCommands()` developpe les variables de role si besoin
+7. les commandes sont executees
+
+Le point important : l'UI et les slash commands passent par le meme point d'entree.
+Ajouter une commande `/bc ...` ne remplace donc pas le clic sur le bouton, c'est juste un complement.
+
+## Commandes slash d'action
+
+Le slash principal reste :
+
+- `/bc`
+
+Sans argument, il ouvre ou ferme l'interface.
+
+Avec un argument, il tente d'executer une action :
+
+- `/bc build`
+- `/bc init`
+- `/bc compose`
+- `/bc summon`
+- `/bc initbots`
+- `/bc tankattack`
+- `/bc attackdps`
+- `/bc follow`
+- `/bc passive`
+- `/bc stay`
+- `/bc used`
+
+Tu peux aussi taper :
+
+- `/bc help`
+
+pour afficher la liste disponible en jeu.
+
+La resolution des slash commands est geree dans `BotControl.lua` via :
+
+- `BotControl.ACTION_COMMAND_ORDER`
+- `BotControl.ACTION_COMMAND_ALIASES`
+- `BotControl.SetupSlashCommands()`
+
+Les variantes avec espaces, tirets ou underscores sont normalisees automatiquement.
+Exemples :
+
+- `/bc tank attack`
+- `/bc tank-attack`
+- `/bc tank_attack`
+
+Ces trois formes pointent vers la meme action.
 
 ## Variables de role disponibles
 
@@ -365,6 +412,24 @@ Exemples de cas speciaux :
 - envoi en file d'attente
 - chainage particulier
 - comportement non standard
+
+### 7.b. Faut-il ajouter un alias slash ?
+
+Si tu veux pouvoir appeler aussi l'action avec `/bc ...`, ajoute une entree dans :
+
+- `BotControl.ACTION_COMMAND_ALIASES` dans `BotControl.lua`
+
+Exemple :
+
+```lua
+MyNewAction = {
+    "mynewaction"
+}
+```
+
+Le premier alias sert de forme canonique pour l'aide affichee via `/bc help`.
+
+Si tu n'ajoutes rien, la resolution essaiera quand meme le nom interne de l'action, mais ajouter un alias explicite est plus propre pour garder des commandes courtes et previsibles.
 
 ### 8. Resize automatique
 

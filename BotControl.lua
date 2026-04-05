@@ -149,6 +149,60 @@ BotControl.ACTION_BUTTON_CONFIG = {
     }
 }
 
+BotControl.ACTION_COMMAND_ORDER = {
+    "ComposeGroup",
+    "Build",
+    "Init",
+    "FullSetup",
+    "Summon",
+    "InitBots",
+    "TankAttack",
+    "AttackDPS",
+    "Follow",
+    "Passive",
+    "Stay",
+    "Used"
+}
+
+BotControl.ACTION_COMMAND_ALIASES = {
+    ComposeGroup = {
+        "compose"
+    },
+    Build = {
+        "build"
+    },
+    Init = {
+        "init"
+    },
+    FullSetup = {
+        "fullsetup"
+    },
+    Summon = {
+        "summon"
+    },
+    InitBots = {
+        "initbots"
+    },
+    TankAttack = {
+        "tankattack"
+    },
+    AttackDPS = {
+        "attackdps"
+    },
+    Follow = {
+        "follow"
+    },
+    Passive = {
+        "passive"
+    },
+    Stay = {
+        "stay"
+    },
+    Used = {
+        "used"
+    }
+}
+
 BotControl.PROFILE_BUTTON_CONFIG = {
     Save = {
         texture = "Interface\\Icons\\INV_Misc_Note_01",
@@ -263,6 +317,15 @@ end
 
 function BotControl.HasValue(value)
     return value ~= nil and value ~= ""
+end
+
+function BotControl.NormalizeCommandAlias(text)
+    text = BotControl.Trim(text or "")
+    text = string.lower(text)
+    text = string.gsub(text, "[%s%-%_]+", "")
+    text = string.gsub(text, "[^%w]", "")
+
+    return text
 end
 
 function BotControl.GetDefaultRoleForField(key)
@@ -962,7 +1025,15 @@ function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onS
 end
 
 function BotControl.Print(message)
-    return
+    if not BotControl.HasValue(message) then
+        return
+    end
+
+    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.AddMessage then
+        DEFAULT_CHAT_FRAME:AddMessage("|cff33ff99BotControl:|r " .. message)
+    elseif print then
+        print("BotControl: " .. message)
+    end
 end
 
 function BotControl.Toggle()
@@ -1635,7 +1706,7 @@ function BotControl.CleanupButtonTemplate(button)
     end
 end
 
-function BotControl_SetActionButtonIcon(button, texturePath, title, description)
+function BotControl_SetActionButtonIcon(button, texturePath, title, description, slashCommand)
     if not button then
         return
     end
@@ -1660,6 +1731,7 @@ function BotControl_SetActionButtonIcon(button, texturePath, title, description)
     button.iconTexture:SetVertexColor(1, 1, 1)
     button.tooltipTitle = title or ""
     button.tooltipDescription = description or ""
+    button.tooltipSlashCommand = slashCommand or ""
 
     button:SetScript("OnEnter", function(self)
         if self.iconTexture then
@@ -1669,6 +1741,9 @@ function BotControl_SetActionButtonIcon(button, texturePath, title, description)
         GameTooltip:SetText(self.tooltipTitle or "")
         if BotControl.HasValue(self.tooltipDescription) then
             GameTooltip:AddLine(self.tooltipDescription, 1, 1, 1, 1)
+        end
+        if BotControl.HasValue(self.tooltipSlashCommand) then
+            GameTooltip:AddLine("Commande : " .. self.tooltipSlashCommand, 0.6, 0.85, 1, 1)
         end
         GameTooltip:Show()
     end)
@@ -1698,44 +1773,70 @@ function BotControl_SetActionButtonIcon(button, texturePath, title, description)
     end)
 end
 
+function BotControl.GetCanonicalActionSlashAlias(actionName)
+    local actionAliases = BotControl.ACTION_COMMAND_ALIASES or {}
+    local canonicalAlias = actionAliases[actionName] and actionAliases[actionName][1]
+
+    if BotControl.HasValue(canonicalAlias) then
+        return canonicalAlias
+    end
+
+    return BotControl.NormalizeCommandAlias(actionName)
+end
+
+function BotControl.GetActionSlashDisplayCommand(actionName)
+    local canonicalAlias
+
+    if not BotControl.HasValue(actionName) then
+        return ""
+    end
+
+    canonicalAlias = BotControl.GetCanonicalActionSlashAlias(actionName)
+    if not BotControl.HasValue(canonicalAlias) then
+        return ""
+    end
+
+    return "/bc " .. canonicalAlias
+end
+
 function BotControl.StyleActionButtons()
     local config
 
     config = BotControl.ACTION_BUTTON_CONFIG.ComposeGroup
-    BotControl_SetActionButtonIcon(BotControlFrameComposeGroupButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFrameComposeGroupButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("ComposeGroup"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Build
-    BotControl_SetActionButtonIcon(BotControlFrameBuildButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFrameBuildButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Build"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Init
-    BotControl_SetActionButtonIcon(BotControlFrameInitButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFrameInitButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Init"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.FullSetup
-    BotControl_SetActionButtonIcon(BotControlFullSetupButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFullSetupButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("FullSetup"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Summon
-    BotControl_SetActionButtonIcon(BotControlFrameSummonButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFrameSummonButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Summon"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.InitBots
-    BotControl_SetActionButtonIcon(BotControlInitBotsButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlInitBotsButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("InitBots"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.TankAttack
-    BotControl_SetActionButtonIcon(BotControlFrameTankAttackButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFrameTankAttackButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("TankAttack"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.AttackDPS
-    BotControl_SetActionButtonIcon(BotControlAttackDPSButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlAttackDPSButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("AttackDPS"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Follow
-    BotControl_SetActionButtonIcon(BotControlFollowButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlFollowButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Follow"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Passive
-    BotControl_SetActionButtonIcon(BotControlPassiveButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlPassiveButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Passive"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Stay
-    BotControl_SetActionButtonIcon(BotControlStayButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlStayButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Stay"))
 
     config = BotControl.ACTION_BUTTON_CONFIG.Used
-    BotControl_SetActionButtonIcon(BotControlUsedButton, config.texture, config.title, config.description)
+    BotControl_SetActionButtonIcon(BotControlUsedButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Used"))
 end
 
 function BotControl.StyleProfileControls()
@@ -2798,10 +2899,138 @@ function BotControl.RunCommandsQueued(commands)
     end
 end
 
+function BotControl.RegisterActionSlashAlias(map, alias, actionName)
+    alias = BotControl.NormalizeCommandAlias(alias)
+    if not BotControl.HasValue(alias) or not BotControl.HasValue(actionName) then
+        return
+    end
+
+    if not map[alias] then
+        map[alias] = actionName
+    end
+end
+
+function BotControl.AppendUniqueActionName(target, lookup, actionName)
+    if not BotControl.HasValue(actionName) or lookup[actionName] then
+        return
+    end
+
+    lookup[actionName] = true
+    table.insert(target, actionName)
+end
+
+function BotControl.GetOrderedActionNames()
+    local orderedActions = {}
+    local knownActions = {}
+    local defaultOrder = BotControl.ACTION_COMMAND_ORDER or {}
+    local actionName
+    local index
+
+    for index = 1, table.getn(defaultOrder) do
+        BotControl.AppendUniqueActionName(orderedActions, knownActions, defaultOrder[index])
+    end
+
+    for actionName in pairs(BotControl.ACTION_BUTTON_CONFIG or {}) do
+        BotControl.AppendUniqueActionName(orderedActions, knownActions, actionName)
+    end
+
+    if BotControlActions and BotControlActions.definitions then
+        for actionName in pairs(BotControlActions.definitions) do
+            BotControl.AppendUniqueActionName(orderedActions, knownActions, actionName)
+        end
+    end
+
+    return orderedActions
+end
+
+function BotControl.GetActionSlashMap()
+    local map = {}
+    local orderedActions = BotControl.GetOrderedActionNames()
+    local actionAliases = BotControl.ACTION_COMMAND_ALIASES or {}
+    local actionName
+    local aliases
+    local actionConfig
+    local definition
+    local index
+    local aliasIndex
+
+    for index = 1, table.getn(orderedActions) do
+        actionName = orderedActions[index]
+        actionConfig = BotControl.ACTION_BUTTON_CONFIG[actionName]
+        definition = BotControlActions and BotControlActions.definitions and BotControlActions.definitions[actionName]
+        aliases = actionAliases[actionName] or {}
+
+        BotControl.RegisterActionSlashAlias(map, actionName, actionName)
+
+        if definition and definition.label then
+            BotControl.RegisterActionSlashAlias(map, definition.label, actionName)
+        end
+
+        if actionConfig and actionConfig.title then
+            BotControl.RegisterActionSlashAlias(map, actionConfig.title, actionName)
+        end
+
+        for aliasIndex = 1, table.getn(aliases) do
+            BotControl.RegisterActionSlashAlias(map, aliases[aliasIndex], actionName)
+        end
+    end
+
+    return map
+end
+
+function BotControl.ResolveActionSlashCommand(message)
+    local map = BotControl.GetActionSlashMap()
+
+    return map[BotControl.NormalizeCommandAlias(message)]
+end
+
+function BotControl.GetActionSlashHelp()
+    local aliases = {}
+    local orderedActions = BotControl.GetOrderedActionNames()
+    local actionAliases = BotControl.ACTION_COMMAND_ALIASES or {}
+    local index
+    local actionName
+    local canonicalAlias
+
+    for index = 1, table.getn(orderedActions) do
+        actionName = orderedActions[index]
+        canonicalAlias = actionAliases[actionName] and actionAliases[actionName][1]
+        if not BotControl.HasValue(canonicalAlias) then
+            canonicalAlias = string.lower(actionName)
+        end
+        table.insert(aliases, canonicalAlias)
+    end
+
+    return "/bc <action> : " .. table.concat(aliases, ", ")
+end
+
 function BotControl.SetupSlashCommands()
     SLASH_BOTCONTROL1 = "/bc"
-    SlashCmdList["BOTCONTROL"] = function()
-        BotControl.Toggle()
+    SlashCmdList["BOTCONTROL"] = function(message)
+        local trimmedMessage = BotControl.Trim(message or "")
+        local actionName
+        local normalizedMessage
+
+        if trimmedMessage == "" then
+            BotControl.Toggle()
+            return
+        end
+
+        normalizedMessage = BotControl.NormalizeCommandAlias(trimmedMessage)
+        if normalizedMessage == "help" or normalizedMessage == "aide" then
+            BotControl.Print("Sans argument, /bc ouvre ou ferme l'interface.")
+            BotControl.Print(BotControl.GetActionSlashHelp())
+            return
+        end
+
+        actionName = BotControl.ResolveActionSlashCommand(trimmedMessage)
+        if actionName then
+            BotControl_RunNamedAction(actionName)
+            return
+        end
+
+        BotControl.Print("Commande inconnue : /bc " .. trimmedMessage)
+        BotControl.Print(BotControl.GetActionSlashHelp())
     end
 end
 

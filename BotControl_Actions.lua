@@ -323,8 +323,8 @@ function BotControlActions:TankAttackCommands()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.tank, "attack")
-    AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
-    AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 10")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 10")
 
     return commands
 end
@@ -334,6 +334,7 @@ function BotControlActions:AttackDPSCommands()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.dps, "attack")
+    AddParty(commands, "co -passive")
 
     return commands
 end

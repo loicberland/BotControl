@@ -109,6 +109,22 @@ local function AddWhisperList(commands, names, message)
     end
 end
 
+local function AddWhisperByRoleAndClass(commands, slots, roleName, className, message)
+    local index
+    local slot
+
+    if type(slots) ~= "table" then
+        return
+    end
+
+    for index = 1, table.getn(slots) do
+        slot = slots[index]
+        if slot and slot.role == roleName and slot.class == className and BotControl.HasValue(slot.name) then
+            AddWhisper(commands, slot.name, message)
+        end
+    end
+end
+
 local function BuildActionConfig()
     local cfg = {
         slots = BotControl.GetActiveProfileSlots(),
@@ -285,15 +301,21 @@ function BotControlActions:InitCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
+    AddSlash(commands, "/run SetLootMethod('master', UnitName('player'))")
     AddParty(commands, "ll -equip,-quest,-skill,-disenchant,-use,-vendor,-trash")
     AddParty(commands, "stance near")
     AddParty(commands, "rti cc none")
     AddParty(commands, "nc -loot")
     -- AddParty(commands, "nc +passive")
     -- AddParty(commands, "co -passive")
-    AddParty(commands, "save mana 2")
+    AddParty(commands, "save mana 3")
     AddParty(commands, "follow")
+    AddParty(commands, "pet defensive")
     AddParty(commands, "co -cc")
+    AddWhisperList(commands, cfg.roleNames.heal, "co -offdps")
+    -- AddWhisperByRoleAndClass(commands, cfg.namedSlots, "dps", "Mage", "co +cc,?")
+    AddWhisperList(commands, cfg.roleNames.heal, "nc -offdps")
+    AddWhisperList(commands, cfg.roleNames.heal, "save mana 2")
 
     AddWhisperList(commands, cfg.roleNames.tank, "stance tank")
     AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti")
@@ -323,8 +345,8 @@ function BotControlActions:TankAttackCommands()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.tank, "attack")
-    AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
-    AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 10")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 10")
 
     return commands
 end
@@ -333,7 +355,12 @@ function BotControlActions:AttackDPSCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
+    AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
+    AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")    
+    AddParty(commands, "pet defensive")
+    AddParty(commands, "free")
     AddWhisperList(commands, cfg.roleNames.dps, "attack")
+    AddParty(commands, "pet attack")
 
     return commands
 end
@@ -342,7 +369,6 @@ function BotControlActions:FollowCommands()
     local commands = {}
 
     AddParty(commands, "follow")
-    AddParty(commands, "co -passive")
 
     return commands
 end
@@ -350,7 +376,9 @@ end
 function BotControlActions:PassiveCommands()
     local commands = {}
 
-    AddParty(commands, "flee")
+    AddParty(commands, "pet passive")
+    AddParty(commands, "nc +passive,?")
+    AddParty(commands, "co +passive,?")
 
     return commands
 end
@@ -359,7 +387,9 @@ function BotControlActions:PassiveDPSCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
-    AddWhisperList(commands, cfg.roleNames.dps, "flee")
+    AddWhisperList(commands, cfg.roleNames.dps, "pet passive")
+    AddWhisperList(commands, cfg.roleNames.dps, "nc +passive,?")
+    AddWhisperList(commands, cfg.roleNames.dps, "co +passive,?")
 
     return commands
 end

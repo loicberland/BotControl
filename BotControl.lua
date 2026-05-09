@@ -1,10 +1,11 @@
-BotControl = {}
+BotControl = BotControl or {}
 BotControl_ProfileElements = {}
 BotControl_ActionElements = {}
 BotControl_ActionSubTabElements = {}
 BotControl_ActionConfigElements = {}
 BotControl_ActionCombatElements = {}
 BotControl_ActionCombatDecorElements = {}
+BotControl.ActionButtons = BotControl.ActionButtons or {}
 BotControl.selectedProfileName = nil
 BotControl.selectedProfileNamesByFormat = {}
 BotControl_SelectedProfileName = nil
@@ -86,133 +87,6 @@ BotControl.PROFILE_FORMAT_ORDER = {
     "party5",
     "raid10",
     "raid25"
-}
-
-BotControl.ACTION_BUTTON_CONFIG = {
-    ComposeGroup = {
-        texture = "Interface\\Icons\\Spell_Nature_MassTeleport",
-        title = "Composer le groupe",
-        description = "Cree le groupe avec les bots configures"
-    },
-    Build = {
-        texture = "Interface\\Icons\\Ability_Marksmanship",
-        title = "Appliquer les spes",
-        description = "Applique les talents aux bots configures"
-    },
-    Init = {
-        texture = "Interface\\Icons\\INV_Misc_Book_09",
-        title = "Initialiser",
-        description = "Applique la configuration de base des bots"
-    },
-    FullSetup = {
-        texture = "Interface\\Icons\\Spell_Holy_BlessingOfStamina",
-        title = "Preparation complete",
-        description = "Lance Build, Init"
-    },
-    Summon = {
-        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
-        title = "Invocation",
-        description = "Invoque tous les bots configures"
-    },
-    InitBots = {
-        texture = "Interface\\Icons\\INV_Misc_Gear_01",
-        title = "Initialisation bots",
-        description = "Lance .bot init, .bot learn, .bot gear et .bot prepare"
-    },
-    TankAttack = {
-        texture = "Interface\\Icons\\Ability_Warrior_Charge",
-        title = "Attaque du tank",
-        description = "Ordonne au tank d'attaquer, les autres attendent"
-    },
-    AttackDPS = {
-        texture = "Interface\\Icons\\Ability_BackStab",
-        title = "Attaque DPS",
-        description = "Ordonne aux DPS d'attaquer"
-    },
-    Follow = {
-        texture = "Interface\\Icons\\Ability_Hunter_Pathfinding",
-        title = "Suivre",
-        description = "Ordonne a tout le groupe de suivre"
-    },
-    Passive = {
-        texture = "Interface\\Icons\\Ability_Rogue_FeignDeath",
-        title = "Passif",
-        description = "Ordonne au groupe de fuir / se desengager"
-    },
-    PassiveDPS = {
-        texture = "Interface\\Icons\\Ability_Rogue_FeignDeath",
-        title = "Passif DPS",
-        description = "Ordonne uniquement aux DPS de fuir / se desengager"
-    },
-    Stay = {
-        texture = "Interface\\Icons\\Spell_Nature_TimeStop",
-        title = "Rester sur place",
-        description = "Ordonne au groupe de rester en place"
-    },
-    Used = {
-        texture = "Interface\\Icons\\INV_Misc_Wrench_01",
-        title = "Utiliser",
-        description = "Lance la commande /p u go"
-    }
-}
-
-BotControl.ACTION_COMMAND_ORDER = {
-    "ComposeGroup",
-    "Build",
-    "Init",
-    "FullSetup",
-    "Summon",
-    "InitBots",
-    "TankAttack",
-    "AttackDPS",
-    "Follow",
-    "Passive",
-    "PassiveDPS",
-    "Stay",
-    "Used"
-}
-
-BotControl.ACTION_COMMAND_ALIASES = {
-    ComposeGroup = {
-        "compose"
-    },
-    Build = {
-        "build"
-    },
-    Init = {
-        "init"
-    },
-    FullSetup = {
-        "fullsetup"
-    },
-    Summon = {
-        "summon"
-    },
-    InitBots = {
-        "initbots"
-    },
-    TankAttack = {
-        "tankattack"
-    },
-    AttackDPS = {
-        "attackdps"
-    },
-    Follow = {
-        "follow"
-    },
-    Passive = {
-        "passive"
-    },
-    PassiveDPS = {
-        "passivedps",
-        "passive dps"
-    },
-    Stay = {
-        "stay"
-    },
-    Used = {
-        "used"
-    }
 }
 
 BotControl.PROFILE_BUTTON_CONFIG = {
@@ -338,6 +212,18 @@ function BotControl.NormalizeCommandAlias(text)
     text = string.gsub(text, "[^%w]", "")
 
     return text
+end
+
+if BotControl.BuildActionLookupTables then
+    BotControl.BuildActionLookupTables()
+end
+
+if BotControlActions and BotControlActions.RefreshDefinitions then
+    BotControlActions:RefreshDefinitions()
+end
+
+if BotControlActions and BotControlActions.CreateLegacyActionWrappers then
+    BotControlActions.CreateLegacyActionWrappers()
 end
 
 function BotControl.GetDefaultRoleForField(key)
@@ -1814,47 +1700,68 @@ function BotControl.GetActionSlashDisplayCommand(actionName)
     return "/bc " .. canonicalAlias
 end
 
+function BotControl.GetActionButtonName(action)
+    if type(action) ~= "table" then
+        return nil
+    end
+
+    if BotControl.HasValue(action.buttonName) then
+        return action.buttonName
+    end
+
+    return "BotControl" .. action.key .. "Button"
+end
+
+function BotControl.GetActionButtonAliases(action)
+    local aliases = {}
+    local primaryName
+
+    if type(action) ~= "table" then
+        return aliases
+    end
+
+    primaryName = BotControl.GetActionButtonName(action)
+    if BotControl.HasValue(primaryName) then
+        table.insert(aliases, primaryName)
+    end
+
+    if primaryName ~= "BotControl" .. action.key .. "Button" then
+        table.insert(aliases, "BotControl" .. action.key .. "Button")
+    end
+
+    return aliases
+end
+
+function BotControl.GetActionButton(actionKey)
+    if BotControl.ActionButtons then
+        return BotControl.ActionButtons[actionKey]
+    end
+
+    return nil
+end
+
 function BotControl.StyleActionButtons()
+    local orderedActions = BotControl.GetOrderedRegistryActions and BotControl.GetOrderedRegistryActions() or {}
+    local index
+    local action
     local config
+    local button
 
-    config = BotControl.ACTION_BUTTON_CONFIG.ComposeGroup
-    BotControl_SetActionButtonIcon(BotControlFrameComposeGroupButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("ComposeGroup"))
+    for index = 1, table.getn(orderedActions) do
+        action = orderedActions[index]
+        config = BotControl.ACTION_BUTTON_CONFIG[action.key]
+        button = BotControl.GetActionButton(action.key)
 
-    config = BotControl.ACTION_BUTTON_CONFIG.Build
-    BotControl_SetActionButtonIcon(BotControlFrameBuildButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Build"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.Init
-    BotControl_SetActionButtonIcon(BotControlFrameInitButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Init"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.FullSetup
-    BotControl_SetActionButtonIcon(BotControlFullSetupButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("FullSetup"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.Summon
-    BotControl_SetActionButtonIcon(BotControlFrameSummonButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Summon"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.InitBots
-    BotControl_SetActionButtonIcon(BotControlInitBotsButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("InitBots"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.TankAttack
-    BotControl_SetActionButtonIcon(BotControlFrameTankAttackButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("TankAttack"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.AttackDPS
-    BotControl_SetActionButtonIcon(BotControlAttackDPSButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("AttackDPS"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.Follow
-    BotControl_SetActionButtonIcon(BotControlFollowButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Follow"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.Passive
-    BotControl_SetActionButtonIcon(BotControlPassiveButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Passive"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.PassiveDPS
-    BotControl_SetActionButtonIcon(BotControlPassiveDPSButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("PassiveDPS"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.Stay
-    BotControl_SetActionButtonIcon(BotControlStayButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Stay"))
-
-    config = BotControl.ACTION_BUTTON_CONFIG.Used
-    BotControl_SetActionButtonIcon(BotControlUsedButton, config.texture, config.title, config.description, BotControl.GetActionSlashDisplayCommand("Used"))
+        if button and config then
+            BotControl_SetActionButtonIcon(
+                button,
+                config.texture,
+                config.title,
+                config.description,
+                BotControl.GetActionSlashDisplayCommand(action.key)
+            )
+        end
+    end
 end
 
 function BotControl.StyleProfileControls()
@@ -1879,6 +1786,9 @@ end
 function BotControl.RegisterTabElements(frame)
     local index
     local field
+    local orderedActions
+    local action
+    local button
 
     BotControl_ProfileElements = {}
     BotControl_ActionElements = {}
@@ -1928,19 +1838,6 @@ function BotControl.RegisterTabElements(frame)
         end
     end
 
-    BotControl.AddElement(BotControl_ActionElements, BotControlFrameComposeGroupButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlFrameBuildButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlFrameInitButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlFullSetupButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlFrameSummonButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlInitBotsButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlFrameTankAttackButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlAttackDPSButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlFollowButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlPassiveButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlPassiveDPSButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlStayButton)
-    BotControl.AddElement(BotControl_ActionElements, BotControlUsedButton)
     BotControl.AddElement(BotControl_ActionElements, BotControlCombatTankHeader)
     BotControl.AddElement(BotControl_ActionElements, BotControlCombatDPSHeader)
     BotControl.AddElement(BotControl_ActionElements, BotControlCombatHealHeader)
@@ -1954,20 +1851,19 @@ function BotControl.RegisterTabElements(frame)
     BotControl.AddElement(BotControl_ActionSubTabElements, BotControlActionsSubTabConfig)
     BotControl.AddElement(BotControl_ActionSubTabElements, BotControlActionsSubTabCombat)
 
-    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameComposeGroupButton)
-    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameBuildButton)
-    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameInitButton)
-    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFullSetupButton)
-    BotControl.AddElement(BotControl_ActionConfigElements, BotControlFrameSummonButton)
-    BotControl.AddElement(BotControl_ActionConfigElements, BotControlInitBotsButton)
+    orderedActions = BotControl.GetOrderedRegistryActions and BotControl.GetOrderedRegistryActions() or {}
+    for index = 1, table.getn(orderedActions) do
+        action = orderedActions[index]
+        button = BotControl.GetActionButton(action.key)
 
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlFrameTankAttackButton)
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlAttackDPSButton)
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlFollowButton)
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlPassiveButton)
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlPassiveDPSButton)
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlStayButton)
-    BotControl.AddElement(BotControl_ActionCombatElements, BotControlUsedButton)
+        BotControl.AddElement(BotControl_ActionElements, button)
+
+        if action.tab == "Combat" then
+            BotControl.AddElement(BotControl_ActionCombatElements, button)
+        else
+            BotControl.AddElement(BotControl_ActionConfigElements, button)
+        end
+    end
 
     BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatTankHeader)
     BotControl.AddElement(BotControl_ActionCombatDecorElements, BotControlCombatDPSHeader)
@@ -2106,15 +2002,48 @@ function BotControl.InitializeFrame(frame)
     frame.isInitialized = true
 end
 
+function BotControl.CreateActionButtons(frame)
+    local orderedActions = BotControl.GetOrderedRegistryActions and BotControl.GetOrderedRegistryActions() or {}
+    local index
+    local action
+    local button
+    local globalNames
+    local nameIndex
+    local buttonName
+
+    if not frame then
+        return
+    end
+
+    BotControl.ActionButtons = BotControl.ActionButtons or {}
+
+    for index = 1, table.getn(orderedActions) do
+        action = orderedActions[index]
+        buttonName = BotControl.GetActionButtonName(action)
+        local actionKey = action.key
+        button = _G[buttonName]
+
+        if not button then
+            button = CreateFrame("Button", buttonName, frame, "UIPanelButtonTemplate")
+        end
+
+        button:SetText(action.label or action.key)
+        button:SetWidth(110)
+        button:SetHeight(24)
+        button:SetScript("OnClick", function()
+            BotControl_RunNamedAction(actionKey)
+        end)
+
+        BotControl.ActionButtons[actionKey] = button
+
+        globalNames = BotControl.GetActionButtonAliases(action)
+        for nameIndex = 1, table.getn(globalNames) do
+            _G[globalNames[nameIndex]] = button
+        end
+    end
+end
+
 function BotControl.CreateButtons(frame)
-    local fullSetupButton
-    local initBotsButton
-    local attackDpsButton
-    local followButton
-    local passiveButton
-    local passiveDpsButton
-    local stayButton
-    local usedButton
     local saveProfileButton
     local loadProfileButton
     local deleteProfileButton
@@ -2253,75 +2182,7 @@ function BotControl.CreateButtons(frame)
         end)
     end
 
-    if not BotControlInitBotsButton then
-        initBotsButton = CreateFrame("Button", "BotControlInitBotsButton", frame, "UIPanelButtonTemplate")
-        initBotsButton:SetText("Init bots")
-        initBotsButton:SetWidth(110)
-        initBotsButton:SetHeight(24)
-        initBotsButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("InitBots")
-        end)
-    end
-
-    if not BotControlAttackDPSButton then
-        attackDpsButton = CreateFrame("Button", "BotControlAttackDPSButton", frame, "UIPanelButtonTemplate")
-        attackDpsButton:SetText("Attack DPS")
-        attackDpsButton:SetWidth(110)
-        attackDpsButton:SetHeight(24)
-        attackDpsButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("AttackDPS")
-        end)
-    end
-
-    if not BotControlFollowButton then
-        followButton = CreateFrame("Button", "BotControlFollowButton", frame, "UIPanelButtonTemplate")
-        followButton:SetText("Follow")
-        followButton:SetWidth(110)
-        followButton:SetHeight(24)
-        followButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("Follow")
-        end)
-    end
-
-    if not BotControlPassiveButton then
-        passiveButton = CreateFrame("Button", "BotControlPassiveButton", frame, "UIPanelButtonTemplate")
-        passiveButton:SetText("Passif")
-        passiveButton:SetWidth(110)
-        passiveButton:SetHeight(24)
-        passiveButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("Passive")
-        end)
-    end
-
-    if not BotControlPassiveDPSButton then
-        passiveDpsButton = CreateFrame("Button", "BotControlPassiveDPSButton", frame, "UIPanelButtonTemplate")
-        passiveDpsButton:SetText("Passif DPS")
-        passiveDpsButton:SetWidth(110)
-        passiveDpsButton:SetHeight(24)
-        passiveDpsButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("PassiveDPS")
-        end)
-    end
-
-    if not BotControlStayButton then
-        stayButton = CreateFrame("Button", "BotControlStayButton", frame, "UIPanelButtonTemplate")
-        stayButton:SetText("Stay")
-        stayButton:SetWidth(110)
-        stayButton:SetHeight(24)
-        stayButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("Stay")
-        end)
-    end
-
-    if not BotControlUsedButton then
-        usedButton = CreateFrame("Button", "BotControlUsedButton", frame, "UIPanelButtonTemplate")
-        usedButton:SetText("Used")
-        usedButton:SetWidth(110)
-        usedButton:SetHeight(24)
-        usedButton:SetScript("OnClick", function()
-            BotControl_RunNamedAction("Used")
-        end)
-    end
+    BotControl.CreateActionButtons(frame)
 
     if not BotControlSaveProfileButton then
         saveProfileButton = CreateFrame("Button", "BotControlSaveProfileButton", frame, "UIPanelButtonTemplate")
@@ -2575,22 +2436,11 @@ function BotControl_LayoutButtons()
     local saveProfileButton = BotControlSaveProfileButton
     local loadProfileButton = BotControlLoadProfileButton
     local deleteProfileButton = BotControlDeleteProfileButton
-    local composeGroupButton = BotControlFrameComposeGroupButton
-    local buildButton = BotControlFrameBuildButton
-    local initButton = BotControlFrameInitButton
-    local fullSetupButton = BotControlFullSetupButton
-    local summonButton = BotControlFrameSummonButton
-    local initBotsButton = BotControlInitBotsButton
-    local tankAttackButton = BotControlFrameTankAttackButton
-    local attackDpsButton = BotControlAttackDPSButton
-    local followButton = BotControlFollowButton
-    local passiveButton = BotControlPassiveButton
-    local passiveDpsButton = BotControlPassiveDPSButton
-    local stayButton = BotControlStayButton
-    local usedButton = BotControlUsedButton
     local saveButton = BotControlFrameSaveButton
     local iconSpacing = BotControl.ACTIONS_ICON_SPACING
     local rowSpacing = BotControl.ACTIONS_ROW_SPACING
+    local orderedActions = BotControl.GetOrderedRegistryActions and BotControl.GetOrderedRegistryActions() or {}
+    local actionGroups = { "Tank", "DPS", "Heal", "All" }
     local actionsAnchor
     local sidePanelX = BotControl.GetProfileSidePanelX(BotControl.GetActiveProfileFormat())
     local combatColumnLeft = 20
@@ -2599,6 +2449,16 @@ function BotControl_LayoutButtons()
     local combatButtonStartY = -120
     local combatSeparatorTop = -86
     local combatSeparatorBottom = 22
+    local action
+    local button
+    local index
+    local groupIndex
+    local groupName
+    local groupActions
+    local baseButtonX
+    local column
+    local row
+    local stepY = BotControl.ACTIONS_ICON_SIZE + rowSpacing
 
     if not frame then
         return
@@ -2742,6 +2602,13 @@ function BotControl_LayoutButtons()
         actionsAnchor = actionsTabButton
     end
 
+    for index = 1, table.getn(orderedActions) do
+        button = BotControl.GetActionButton(orderedActions[index].key)
+        if button then
+            button:ClearAllPoints()
+        end
+    end
+
     if BotControl.currentTab == "Actions" and BotControl.currentActionsSubTab == "Combat" then
         if combatTankHeader then
             combatTankHeader:ClearAllPoints()
@@ -2785,58 +2652,19 @@ function BotControl_LayoutButtons()
             combatSeparator3:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", combatColumnLeft + (combatColumnWidth * 3), combatSeparatorBottom)
         end
 
-        if tankAttackButton then
-            tankAttackButton:ClearAllPoints()
-            tankAttackButton:SetPoint("TOP", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 0.5), combatButtonStartY)
-        end
+        for groupIndex = 1, table.getn(actionGroups) do
+            groupName = actionGroups[groupIndex]
+            groupActions = BotControl.GetActionsForGroup and BotControl.GetActionsForGroup("Combat", groupName) or {}
+            baseButtonX = combatColumnLeft + ((groupIndex - 1) * combatColumnWidth) + (combatColumnWidth * 0.5)
 
-        if attackDpsButton then
-            attackDpsButton:ClearAllPoints()
-            attackDpsButton:SetPoint("TOP", frame, "TOPLEFT", combatColumnLeft + combatColumnWidth + (combatColumnWidth * 0.5), combatButtonStartY)
-        end
+            for index = 1, table.getn(groupActions) do
+                action = groupActions[index]
+                button = BotControl.GetActionButton(action.key)
 
-        if followButton then
-            followButton:ClearAllPoints()
-            followButton:SetPoint("TOP", frame, "TOPLEFT", combatColumnLeft + (combatColumnWidth * 3) + (combatColumnWidth * 0.5), combatButtonStartY)
-        end
-
-        if passiveButton then
-            passiveButton:ClearAllPoints()
-            passiveButton:SetPoint("TOP", followButton, "BOTTOM", 0, -rowSpacing)
-        end
-
-        if passiveDpsButton then
-            passiveDpsButton:ClearAllPoints()
-            passiveDpsButton:SetPoint("TOP", attackDpsButton, "BOTTOM", 0, -rowSpacing)
-        end
-
-        if stayButton then
-            stayButton:ClearAllPoints()
-            stayButton:SetPoint("TOP", passiveButton, "BOTTOM", 0, -rowSpacing)
-        end
-
-        if usedButton then
-            usedButton:ClearAllPoints()
-            usedButton:SetPoint("TOP", stayButton, "BOTTOM", 0, -rowSpacing)
-        end
-
-        if composeGroupButton then
-            composeGroupButton:ClearAllPoints()
-        end
-        if buildButton then
-            buildButton:ClearAllPoints()
-        end
-        if initButton then
-            initButton:ClearAllPoints()
-        end
-        if fullSetupButton then
-            fullSetupButton:ClearAllPoints()
-        end
-        if summonButton then
-            summonButton:ClearAllPoints()
-        end
-        if initBotsButton then
-            initBotsButton:ClearAllPoints()
+                if button then
+                    button:SetPoint("TOP", frame, "TOPLEFT", baseButtonX, combatButtonStartY - ((index - 1) * stepY))
+                end
+            end
         end
     else
         if combatTankHeader then
@@ -2861,67 +2689,20 @@ function BotControl_LayoutButtons()
             combatSeparator3:ClearAllPoints()
         end
 
-        if composeGroupButton then
-            composeGroupButton:ClearAllPoints()
-            if actionsAnchor then
-                composeGroupButton:SetPoint("TOPLEFT", actionsAnchor, "BOTTOMLEFT", 0, -24)
-            else
-                composeGroupButton:SetPoint("TOPLEFT", frame, "TOPLEFT", 20, -104)
+        groupActions = BotControl.GetActionsForTab and BotControl.GetActionsForTab("Config") or {}
+        for index = 1, table.getn(groupActions) do
+            action = groupActions[index]
+            button = BotControl.GetActionButton(action.key)
+            column = index - 1 - (math.floor((index - 1) / 4) * 4)
+            row = math.floor((index - 1) / 4)
+
+            if button then
+                if actionsAnchor then
+                    button:SetPoint("TOPLEFT", actionsAnchor, "BOTTOMLEFT", column * (BotControl.ACTIONS_ICON_SIZE + iconSpacing), -24 - (row * stepY))
+                else
+                    button:SetPoint("TOPLEFT", frame, "TOPLEFT", 20 + (column * (BotControl.ACTIONS_ICON_SIZE + iconSpacing)), -104 - (row * stepY))
+                end
             end
-        end
-
-        if buildButton then
-            buildButton:ClearAllPoints()
-            if composeGroupButton then
-                buildButton:SetPoint("LEFT", composeGroupButton, "RIGHT", iconSpacing, 0)
-            end
-        end
-
-        if initBotsButton then
-            initBotsButton:ClearAllPoints()
-            if buildButton then
-                initBotsButton:SetPoint("LEFT", buildButton, "RIGHT", iconSpacing, 0)
-            end
-        end
-
-        if initButton then
-            initButton:ClearAllPoints()
-            if initBotsButton then
-                initButton:SetPoint("LEFT", initBotsButton, "RIGHT", iconSpacing, 0)
-            end
-        end
-
-        if fullSetupButton then
-            fullSetupButton:ClearAllPoints()
-        end
-
-        if summonButton then
-            summonButton:ClearAllPoints()
-            if composeGroupButton then
-                summonButton:SetPoint("TOPLEFT", composeGroupButton, "BOTTOMLEFT", 0, -rowSpacing)
-            end
-        end
-
-        if tankAttackButton then
-            tankAttackButton:ClearAllPoints()
-        end
-        if attackDpsButton then
-            attackDpsButton:ClearAllPoints()
-        end
-        if followButton then
-            followButton:ClearAllPoints()
-        end
-        if passiveButton then
-            passiveButton:ClearAllPoints()
-        end
-        if passiveDpsButton then
-            passiveDpsButton:ClearAllPoints()
-        end
-        if stayButton then
-            stayButton:ClearAllPoints()
-        end
-        if usedButton then
-            usedButton:ClearAllPoints()
         end
     end
 
@@ -3102,24 +2883,12 @@ function BotControl.AppendUniqueActionName(target, lookup, actionName)
 end
 
 function BotControl.GetOrderedActionNames()
-    local orderedActions = {}
-    local knownActions = {}
     local defaultOrder = BotControl.ACTION_COMMAND_ORDER or {}
-    local actionName
+    local orderedActions = {}
     local index
 
     for index = 1, table.getn(defaultOrder) do
-        BotControl.AppendUniqueActionName(orderedActions, knownActions, defaultOrder[index])
-    end
-
-    for actionName in pairs(BotControl.ACTION_BUTTON_CONFIG or {}) do
-        BotControl.AppendUniqueActionName(orderedActions, knownActions, actionName)
-    end
-
-    if BotControlActions and BotControlActions.definitions then
-        for actionName in pairs(BotControlActions.definitions) do
-            BotControl.AppendUniqueActionName(orderedActions, knownActions, actionName)
-        end
+        table.insert(orderedActions, defaultOrder[index])
     end
 
     return orderedActions
@@ -3127,34 +2896,12 @@ end
 
 function BotControl.GetActionSlashMap()
     local map = {}
-    local orderedActions = BotControl.GetOrderedActionNames()
-    local actionAliases = BotControl.ACTION_COMMAND_ALIASES or {}
+    local registryMap = BotControl.ACTION_SLASH_MAP or {}
+    local alias
     local actionName
-    local aliases
-    local actionConfig
-    local definition
-    local index
-    local aliasIndex
 
-    for index = 1, table.getn(orderedActions) do
-        actionName = orderedActions[index]
-        actionConfig = BotControl.ACTION_BUTTON_CONFIG[actionName]
-        definition = BotControlActions and BotControlActions.definitions and BotControlActions.definitions[actionName]
-        aliases = actionAliases[actionName] or {}
-
-        BotControl.RegisterActionSlashAlias(map, actionName, actionName)
-
-        if definition and definition.label then
-            BotControl.RegisterActionSlashAlias(map, definition.label, actionName)
-        end
-
-        if actionConfig and actionConfig.title then
-            BotControl.RegisterActionSlashAlias(map, actionConfig.title, actionName)
-        end
-
-        for aliasIndex = 1, table.getn(aliases) do
-            BotControl.RegisterActionSlashAlias(map, aliases[aliasIndex], actionName)
-        end
+    for alias, actionName in pairs(registryMap) do
+        map[alias] = actionName
     end
 
     return map
@@ -3166,27 +2913,42 @@ function BotControl.ResolveActionSlashCommand(message)
     return map[BotControl.NormalizeCommandAlias(message)]
 end
 
-function BotControl.GetActionSlashHelp()
-    local aliases = {}
-    local orderedActions = BotControl.GetOrderedActionNames()
-    local actionAliases = BotControl.ACTION_COMMAND_ALIASES or {}
+function BotControl.GetActionSlashHelpLines()
+    local lines = {}
+    local tabs = { "Config", "Combat" }
+    local tabName
+    local actions
+    local aliases
     local index
-    local actionName
-    local canonicalAlias
+    local action
 
-    for index = 1, table.getn(orderedActions) do
-        actionName = orderedActions[index]
-        canonicalAlias = actionAliases[actionName] and actionAliases[actionName][1]
-        if not BotControl.HasValue(canonicalAlias) then
-            canonicalAlias = string.lower(actionName)
+    for index = 1, table.getn(tabs) do
+        tabName = tabs[index]
+        actions = BotControl.GetActionsForTab and BotControl.GetActionsForTab(tabName) or {}
+        aliases = {}
+
+        for _, action in ipairs(actions) do
+            table.insert(aliases, BotControl.GetCanonicalActionSlashAlias(action.key))
         end
-        table.insert(aliases, canonicalAlias)
+
+        if table.getn(aliases) > 0 then
+            table.insert(lines, tabName .. " : " .. table.concat(aliases, ", "))
+        end
     end
 
-    return "/bc <action> : " .. table.concat(aliases, ", ")
+    return lines
+end
+
+function BotControl.GetActionSlashHelp()
+    local helpLines = BotControl.GetActionSlashHelpLines()
+
+    return table.concat(helpLines, " | ")
 end
 
 function BotControl.SetupSlashCommands()
+    local helpLines
+    local index
+
     SLASH_BOTCONTROL1 = "/bc"
     SlashCmdList["BOTCONTROL"] = function(message)
         local trimmedMessage = BotControl.Trim(message or "")
@@ -3201,7 +2963,10 @@ function BotControl.SetupSlashCommands()
         normalizedMessage = BotControl.NormalizeCommandAlias(trimmedMessage)
         if normalizedMessage == "help" or normalizedMessage == "aide" then
             BotControl.Print("Sans argument, /bc ouvre ou ferme l'interface.")
-            BotControl.Print(BotControl.GetActionSlashHelp())
+            helpLines = BotControl.GetActionSlashHelpLines()
+            for index = 1, table.getn(helpLines) do
+                BotControl.Print(helpLines[index])
+            end
             return
         end
 
@@ -3212,7 +2977,10 @@ function BotControl.SetupSlashCommands()
         end
 
         BotControl.Print("Commande inconnue : /bc " .. trimmedMessage)
-        BotControl.Print(BotControl.GetActionSlashHelp())
+        helpLines = BotControl.GetActionSlashHelpLines()
+        for index = 1, table.getn(helpLines) do
+            BotControl.Print(helpLines[index])
+        end
     end
 end
 
@@ -3269,29 +3037,14 @@ function BotControl_SaveButton_OnClick()
 end
 
 function BotControl_RunNamedAction(actionName)
+    local handler
+
     BotControl.Save()
 
-    if actionName == "FullSetup" then
-        BotControl_Action_FullSetup()
-    elseif actionName == "Build" then
-        BotControl_Action_Build()
-    elseif actionName == "Init" then
-        BotControl_Action_Init()
-    elseif actionName == "Summon" then
-        BotControl_Action_Summon()
-    elseif actionName == "InitBots" then
-        BotControl_Action_InitBots()
-    elseif actionName == "AttackDPS" then
-        BotControl_Action_AttackDPS()
-    elseif actionName == "Follow" then
-        BotControl_Action_Follow()
-    elseif actionName == "Passive" then
-        BotControl_Action_Passive()
-    elseif actionName == "Stay" then
-        BotControl_Action_Stay()
-    elseif actionName == "Used" then
-        BotControl_Action_Used()
-    else
+    handler = _G["BotControl_Action_" .. (actionName or "")]
+    if type(handler) == "function" then
+        handler()
+    elseif BotControlActions and BotControlActions.RunAction then
         BotControlActions:RunAction(actionName)
     end
 end

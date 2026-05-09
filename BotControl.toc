@@ -7,6 +7,7 @@
 ## SavedVariablesPerCharacter: BotControlCharacterDB
 
 BotControl_Config.lua
+BotControl_ActionRegistry.lua
 BotControl_Actions.lua
 BotControl.lua
 BotControl.xml

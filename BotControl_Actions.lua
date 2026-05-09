@@ -1,55 +1,6 @@
 BotControlActions = {}
 
-BotControlActions.definitions = {
-    ComposeGroup = {
-        label = "Compose group",
-        builder = "ComposeGroupCommands"
-    },
-    Build = {
-        label = "Build",
-        builder = "BuildCommands"
-    },
-    Init = {
-        label = "Init",
-        builder = "InitCommands"
-    },
-    Summon = {
-        label = "Summon",
-        builder = "SummonCommands"
-    },
-    InitBots = {
-        label = "Init bots",
-        builder = "InitBotsCommands"
-    },
-    TankAttack = {
-        label = "Tank attack",
-        builder = "TankAttackCommands"
-    },
-    AttackDPS = {
-        label = "Attack DPS",
-        builder = "AttackDPSCommands"
-    },
-    Follow = {
-        label = "Follow",
-        builder = "FollowCommands"
-    },
-    Passive = {
-        label = "Passive",
-        builder = "PassiveCommands"
-    },
-    PassiveDPS = {
-        label = "Passive DPS",
-        builder = "PassiveDPSCommands"
-    },
-    Stay = {
-        label = "Stay",
-        builder = "StayCommands"
-    },
-    Used = {
-        label = "Used",
-        builder = "UsedCommands"
-    }
-}
+BotControlActions.definitions = BotControlActions.definitions or {}
 
 local function AddCommand(commands, command)
     if command and command ~= "" then
@@ -456,82 +407,85 @@ function BotControlActions:ComposeGroupCommands()
     return commands
 end
 
-function BotControlActions:RunAction(actionKey)
-    local definition
-    local commands
+function BotControlActions:GetActionDefinition(actionKey)
+    if BotControl and BotControl.GetActionByKey then
+        return BotControl.GetActionByKey(actionKey)
+    end
 
-    definition = self.definitions[actionKey]
-    if not definition or not self[definition.builder] then
+    return self.definitions and self.definitions[actionKey]
+end
+
+function BotControlActions:RunAction(actionKey)
+    local action
+    local commands
+    local builder
+    local sequence
+    local index
+
+    action = self:GetActionDefinition(actionKey)
+    if not action then
         return
     end
 
-    commands = self[definition.builder](self)
-    BotControl.RunCommands(self:PrepareCommands(commands))
-end
+    sequence = action.sequence
+    if type(sequence) == "table" and table.getn(sequence) > 0 then
+        for index = 1, table.getn(sequence) do
+            self:RunAction(sequence[index])
+        end
+        return
+    end
 
-function BotControl_Action_Build()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Build")
+    builder = action.builder
+    if not builder or not self[builder] then
+        return
+    end
+
+    commands = self[builder](self)
+    commands = self:PrepareCommands(commands)
+
+    if action.queued and BotControl.RunCommandsQueued then
+        BotControl.RunCommandsQueued(commands)
+    else
+        BotControl.RunCommands(commands)
     end
 end
 
-function BotControl_Action_Init()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Init")
+function BotControlActions:RefreshDefinitions()
+    local orderedActions
+    local index
+    local action
+
+    self.definitions = {}
+
+    if BotControl and BotControl.GetOrderedRegistryActions then
+        orderedActions = BotControl.GetOrderedRegistryActions()
+        for index = 1, table.getn(orderedActions) do
+            action = orderedActions[index]
+            self.definitions[action.key] = action
+        end
     end
 end
 
-function BotControl_Action_Summon()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Summon")
+function BotControlActions.CreateLegacyActionWrappers()
+    local orderedActions
+    local index
+    local actionKey
+
+    if not BotControl or not BotControl.GetOrderedRegistryActions then
+        return
+    end
+
+    orderedActions = BotControl.GetOrderedRegistryActions()
+    for index = 1, table.getn(orderedActions) do
+        actionKey = orderedActions[index].key
+        local wrappedActionKey = actionKey
+        _G["BotControl_Action_" .. actionKey] = function()
+            if BotControlActions and BotControlActions.RunAction then
+                BotControlActions:RunAction(wrappedActionKey)
+            end
+        end
     end
 end
 
-function BotControl_Action_InitBots()
-    local commands
-
-    if BotControlActions and BotControlActions.InitBotsCommands and BotControl.RunCommandsQueued then
-        commands = BotControlActions:InitBotsCommands()
-        BotControl.RunCommandsQueued(BotControlActions:PrepareCommands(commands))
-    end
-end
-
-function BotControl_Action_AttackDPS()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("AttackDPS")
-    end
-end
-
-function BotControl_Action_Follow()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Follow")
-    end
-end
-
-function BotControl_Action_Passive()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Passive")
-    end
-end
-
-function BotControl_Action_Stay()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Stay")
-    end
-end
-
-function BotControl_Action_Used()
-    if BotControlActions and BotControlActions.RunAction then
-        BotControlActions:RunAction("Used")
-    end
-end
-
-function BotControl_Action_FullSetup()
-    if BotControl_Action_Build then
-        BotControl_Action_Build()
-    end
-
-    if BotControl_Action_Init then
-        BotControl_Action_Init()
-    end
-end
+BotControlActions:RefreshDefinitions()
+BotControlActions.CreateLegacyActionWrappers()

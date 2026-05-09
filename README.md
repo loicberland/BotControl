@@ -2,114 +2,113 @@
 
 Addon WoW 2.4.3 pour piloter des bots via une interface simple.
 
-Le but principal de ce README est d'expliquer comment ajouter, modifier et brancher un bouton d'action sans casser le reste.
+## Structure
 
-## Structure rapide
-
-- `BotControl.lua`
-  Gere l'interface, les onglets, les sous-onglets, le layout, les boutons, les tooltips et l'execution des actions cote UI.
+- `BotControl_ActionRegistry.lua`
+  Registre central declaratif des actions.
 - `BotControl_Actions.lua`
-  Gere la logique des actions et construit les commandes a executer.
+  Builders des commandes et execution des actions.
+- `BotControl.lua`
+  UI, slash commands, layout et generation des boutons.
 - `BotControl_Config.lua`
-  Gere la config sauvegardee.
+  Stockage et chargement des profils.
 - `BotControl.xml`
-  Declare la frame principale et quelques elements de base.
+  Frame principale et quelques boutons XML historiques.
 
-## Etat actuel
+## Principe actuel
 
-### Onglet Profiles
+Les actions ne sont plus decrites a plusieurs endroits.
 
-L'onglet `Profiles` gere maintenant 3 formats :
+La source de verite est maintenant :
 
-- `5 joueurs`
-- `10 joueurs`
-- `25 joueurs`
+- `BotControl.ActionRegistry`
 
-Chaque format possede :
+Chaque action declare en un seul bloc :
 
-- ses propres profils sauvegardes
-- son propre layout
-- son propre jeu de slots actifs
+- sa cle interne
+- son label
+- son icone
+- son tooltip
+- son sous-onglet
+- son groupe visuel
+- son ordre
+- ses alias slash
+- son builder
+- si elle doit etre queuee
+- eventuellement une `sequence`
 
-Les slots utilisent tous la meme structure :
+Exemple :
 
 ```lua
 {
-    name = "NomDuBot",
-    role = "dps",
-    class = "Mage",
-    spec = "pve dps fire",
+    key = "ComposeGroup",
+    label = "Composer le groupe",
+    tooltipTitle = "Composer le groupe",
+    tooltipDescription = "Cree le groupe avec les bots configures",
+    texture = "Interface\\Icons\\Spell_Nature_MassTeleport",
+    tab = "Config",
+    group = "Config",
+    order = 10,
+    aliases = { "compose" },
+    builder = "ComposeGroupCommands",
+    queued = false
 }
 ```
 
-### Onglet Actions
+## Ce qui est genere automatiquement
 
-L'onglet `Actions` est separe en 2 sous-onglets :
+A partir du registre, l'addon reconstruit automatiquement :
+
+- `BotControl.ACTION_BUTTON_CONFIG`
+- `BotControl.ACTION_COMMAND_ORDER`
+- `BotControl.ACTION_COMMAND_ALIASES`
+- `BotControl.ACTION_BY_KEY`
+- `BotControl.ACTIONS_BY_TAB`
+- `BotControl.ACTIONS_BY_GROUP`
+
+Le registre sert aussi a :
+
+- resoudre les slash commands `/bc ...`
+- construire l'aide `/bc help`
+- creer les boutons d'action
+- enregistrer les boutons dans les bons groupes UI
+- positionner les boutons dans le layout
+- executer les actions via `builder`, `queued` ou `sequence`
+
+## Onglet Actions
+
+Les sous-onglets existants restent :
 
 - `Config`
 - `Combat`
 
-Les groupes d'elements utilises par l'UI sont dans `BotControl.lua` :
+La presentation `Combat` conserve les groupes visuels :
 
-- `BotControl_ActionElements`
-- `BotControl_ActionSubTabElements`
-- `BotControl_ActionConfigElements`
-- `BotControl_ActionCombatElements`
+- `Tank`
+- `DPS`
+- `Heal`
+- `All`
 
-### Actions actuellement en place
+Le layout est maintenant calcule a partir du registre :
 
-Sous-onglet `Config` :
+- `Config` affiche les actions `tab = "Config"` triees par `order`
+- `Combat` affiche les actions `tab = "Combat"` regroupees par `group`, puis triees par `order`
 
-- `ComposeGroup`
-- `Build`
-- `Init`
-- `FullSetup`
-- `Summon`
-- `InitBots`
-
-Sous-onglet `Combat` :
-
-- `TankAttack`
-- `AttackDPS`
-- `Follow`
-- `Passive`
-- `PassiveDPS`
-- `Stay`
-- `Used`
-
-Presentation actuelle du sous-onglet `Combat` :
-
-- colonne `Tank` : actions qui ciblent le tank
-- colonne `DPS` : actions qui ciblent les DPS
-- colonne `Heal` : reservee aux actions de soin
-- colonne `All` : actions generales pour tout le groupe
-
-Les icones et tooltips de ces boutons sont decrits dans `BotControl.ACTION_BUTTON_CONFIG` dans `BotControl.lua`.
-
-## Flux actuel d'une action
-
-Quand on clique sur un bouton d'action ou qu'on tape une commande slash comme `/bc build` :
-
-1. le bouton ou la slash command resolvent un nom d'action interne
-2. `BotControl_RunNamedAction("ActionName")` est appele
-3. sauf cas special, `BotControlActions:RunAction(actionName)` est appele
-4. `BotControl_Actions.lua` cherche l'action dans `BotControlActions.definitions`
-5. la fonction `...Commands()` correspondante construit une liste de commandes
-6. `PrepareCommands()` developpe les variables de role si besoin
-7. les commandes sont executees
-
-Le point important : l'UI et les slash commands passent par le meme point d'entree.
-Ajouter une commande `/bc ...` ne remplace donc pas le clic sur le bouton, c'est juste un complement.
-
-## Commandes slash d'action
+## Slash commands
 
 Le slash principal reste :
 
 - `/bc`
 
-Sans argument, il ouvre ou ferme l'interface.
+Sans argument :
 
-Avec un argument, il tente d'executer une action :
+- ouvre ou ferme l'interface
+
+Avec un argument :
+
+- execute une action declaree dans le registre
+
+Exemples :
 
 - `/bc build`
 - `/bc init`
@@ -117,242 +116,78 @@ Avec un argument, il tente d'executer une action :
 - `/bc summon`
 - `/bc initbots`
 - `/bc tankattack`
-- `/bc attackdps`
-- `/bc follow`
-- `/bc passive`
-- `/bc passivedps`
-- `/bc stay`
-- `/bc used`
-
-Tu peux aussi taper :
-
-- `/bc help`
-
-pour afficher la liste disponible en jeu.
-
-La resolution des slash commands est geree dans `BotControl.lua` via :
-
-- `BotControl.ACTION_COMMAND_ORDER`
-- `BotControl.ACTION_COMMAND_ALIASES`
-- `BotControl.SetupSlashCommands()`
-
-Les variantes avec espaces, tirets ou underscores sont normalisees automatiquement.
-Exemples :
-
 - `/bc tank attack`
 - `/bc tank-attack`
 - `/bc tank_attack`
+- `/bc attackdps`
+- `/bc attack dps`
+- `/bc passive`
+- `/bc passive dps`
+- `/bc help`
 
-Ces trois formes pointent vers la meme action.
+Les alias avec espaces, tirets et underscores sont toujours normalises.
 
-## Variables de role disponibles
+## Execution des actions
 
-Le moteur d'actions supporte maintenant :
+Le point d'entree UI et slash reste :
 
-- `{tank}`
-- `{heal}`
-- `{dps}`
-
-Elles representent tous les bots du profil actif correspondant au role.
-
-Exemple :
-
-```text
-/w {tank} stance tank
-```
-
-Si le profil actif contient `TankA` et `TankB` en role `tank`, l'action est developpee en :
-
-```text
-/w TankA stance tank
-/w TankB stance tank
-```
-
-Cette expansion est faite dans `BotControl_Actions.lua` via `PrepareCommands()`.
-
-## Ajouter un nouveau bouton d'action
-
-Exemple :
-
-- nom interne : `MyNewAction`
-- sous-onglet : `Combat`
-- titre tooltip : `Mon action`
-- description tooltip : `Lance une commande de test`
-
-### 1. Ajouter la config visuelle
-
-Fichier :
-
-- `BotControl.lua`
-
-Zone :
-
-- table `BotControl.ACTION_BUTTON_CONFIG`
-
-Exemple :
-
-```lua
-MyNewAction = {
-    texture = "Interface\\Icons\\INV_Misc_QuestionMark",
-    title = "Mon action",
-    description = "Lance une commande de test"
-}
-```
-
-Cette entree sert pour :
-
-- l'icone
-- le tooltip
-- le style uniforme
-
-### 2. Creer le bouton dans l'UI
-
-Fichier :
-
-- `BotControl.lua`
-
-Zone :
-
-- fonction `BotControl.CreateButtons(frame)`
-
-Il faut :
-
-1. ajouter une variable locale au debut de la fonction
-2. creer le bouton
-3. brancher le `OnClick`
-
-Exemple :
-
-```lua
-local myNewActionButton
-```
+- `BotControl_RunNamedAction(actionKey)`
 
 Puis :
 
-```lua
-if not BotControlMyNewActionButton then
-    myNewActionButton = CreateFrame("Button", "BotControlMyNewActionButton", frame, "UIPanelButtonTemplate")
-    myNewActionButton:SetText("My action")
-    myNewActionButton:SetWidth(110)
-    myNewActionButton:SetHeight(24)
-    myNewActionButton:SetScript("OnClick", function()
-        BotControl_RunNamedAction("MyNewAction")
-    end)
-end
-```
+1. l'action est resolue dans `BotControl.ACTION_BY_KEY`
+2. `BotControlActions:RunAction(actionKey)` lit le registre
+3. si l'action declare `sequence`, chaque action de la sequence est lancee
+4. sinon le `builder` est appele
+5. `PrepareCommands()` developpe les tokens de role
+6. l'execution passe par :
+   - `BotControl.RunCommands(...)`
+   - ou `BotControl.RunCommandsQueued(...)` si `queued = true`
 
-Le texte du bouton est peu important visuellement, car le bouton est ensuite transforme en bouton icone.
+Cas particuliers conserves :
 
-### 3. Appliquer le style icone + tooltip
+- `InitBots` reste queuee
+- `FullSetup` lance `Build` puis `Init`
 
-Fichier :
+## Ajouter un nouveau bouton d'action
 
-- `BotControl.lua`
+Pour ajouter une action simple, il faut maintenant :
 
-Zone :
+1. ajouter une entree dans `BotControl.ActionRegistry`
+2. ajouter un builder dans `BotControl_Actions.lua` seulement si l'action a une logique nouvelle
 
-- fonction `BotControl.StyleActionButtons()`
+Il ne faut plus modifier manuellement :
 
-Ajouter :
+- le layout
+- `ACTION_BUTTON_CONFIG`
+- `ACTION_COMMAND_ORDER`
+- `ACTION_COMMAND_ALIASES`
+- la creation du bouton
+- l'enregistrement dans `BotControl_ActionElements`
+- l'enregistrement dans `BotControl_ActionConfigElements`
+- l'enregistrement dans `BotControl_ActionCombatElements`
 
-```lua
-config = BotControl.ACTION_BUTTON_CONFIG.MyNewAction
-BotControl_SetActionButtonIcon(BotControlMyNewActionButton, config.texture, config.title, config.description)
-```
+### Exemple complet
 
-### 4. Enregistrer le bouton dans les bons groupes
-
-Fichier :
-
-- `BotControl.lua`
-
-Zone :
-
-- fonction `BotControl.RegisterTabElements(frame)`
-
-Toujours ajouter le bouton dans :
-
-- `BotControl_ActionElements`
-
-Puis l'ajouter dans le bon sous-groupe :
-
-- `BotControl_ActionConfigElements` si le bouton doit apparaitre dans `Config`
-- `BotControl_ActionCombatElements` si le bouton doit apparaitre dans `Combat`
-
-Exemple pour `Combat` :
+Ajouter cette entree dans `BotControl.ActionRegistry` :
 
 ```lua
-BotControl.AddElement(BotControl_ActionElements, BotControlMyNewActionButton)
-BotControl.AddElement(BotControl_ActionCombatElements, BotControlMyNewActionButton)
-```
-
-Exemple pour `Config` :
-
-```lua
-BotControl.AddElement(BotControl_ActionElements, BotControlMyNewActionButton)
-BotControl.AddElement(BotControl_ActionConfigElements, BotControlMyNewActionButton)
-```
-
-Important :
-
-- si tu oublies `BotControl_ActionElements`, le bouton ne suivra pas correctement l'affichage global de l'onglet `Actions`
-- si tu oublies le sous-groupe `Config` ou `Combat`, il n'apparaitra pas dans le bon sous-onglet
-
-### 5. Positionner le bouton dans le layout
-
-Fichier :
-
-- `BotControl.lua`
-
-Zone :
-
-- fonction `BotControl_LayoutButtons()`
-
-Il faut :
-
-1. recuperer le bouton dans une variable locale
-2. le positionner dans le bloc `Config` ou `Combat`
-
-Exemple :
-
-```lua
-local myNewActionButton = BotControlMyNewActionButton
-```
-
-Puis dans le bloc voulu :
-
-```lua
-if myNewActionButton then
-    myNewActionButton:ClearAllPoints()
-    myNewActionButton:SetPoint("LEFT", usedButton, "RIGHT", iconSpacing, 0)
-end
-```
-
-Conseil :
-
-- dans `Config`, place-le apres le dernier bouton `Config`
-- dans `Combat`, place-le apres le dernier bouton `Combat`
-
-### 6. Ajouter la logique de l'action
-
-Fichier :
-
-- `BotControl_Actions.lua`
-
-#### a. Declarer l'action
-
-Dans `BotControlActions.definitions`, ajouter :
-
-```lua
-MyNewAction = {
-    label = "My new action",
-    builder = "MyNewActionCommands"
+{
+    key = "MyNewAction",
+    label = "Mon action",
+    tooltipTitle = "Mon action",
+    tooltipDescription = "Lance une commande de test",
+    texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+    tab = "Combat",
+    group = "All",
+    order = 100,
+    aliases = { "mynewaction", "my new action" },
+    builder = "MyNewActionCommands",
+    queued = false
 }
 ```
 
-#### b. Creer la fonction qui construit les commandes
-
-Exemple simple :
+Puis ajouter le builder :
 
 ```lua
 function BotControlActions:MyNewActionCommands()
@@ -364,205 +199,80 @@ function BotControlActions:MyNewActionCommands()
 end
 ```
 
-Helpers deja disponibles :
-
-- `AddWhisper(commands, target, message)`
-- `AddParty(commands, message)`
-- `AddSlash(commands, command)`
-
-Si tu veux supporter les variables de role, tu peux ecrire directement des commandes avec :
-
-- `{tank}`
-- `{heal}`
-- `{dps}`
-
-Exemple :
-
-```lua
-function BotControlActions:MyNewActionCommands()
-    local commands = {}
-
-    AddSlash(commands, "/w {tank} stance tank")
-    AddSlash(commands, "/w {heal} stay")
-
-    return commands
-end
-```
-
-`PrepareCommands()` se charge ensuite de dupliquer la commande pour chaque bot cible.
-
-#### c. Creer une fonction speciale uniquement si besoin
-
-Dans la plupart des cas, ce n'est pas necessaire.
-
-Le flux standard suffit si :
-
-- l'action existe dans `BotControlActions.definitions`
-- la fonction `...Commands()` existe
-- le bouton appelle `BotControl_RunNamedAction("MyNewAction")`
-
-### 7. Faut-il modifier `BotControl_RunNamedAction()` ?
-
-Fichier :
-
-- `BotControl.lua`
-
-Zone :
-
-- fonction `BotControl_RunNamedAction(actionName)`
-
-Regle actuelle :
-
-- cas normal : ne rien ajouter, le `else` final appelle deja `BotControlActions:RunAction(actionName)`
-- cas special : ajouter une branche seulement si le comportement doit etre different
-
-Exemples de cas speciaux :
-
-- envoi en file d'attente
-- chainage particulier
-- comportement non standard
-
-### 7.b. Faut-il ajouter un alias slash ?
-
-Si tu veux pouvoir appeler aussi l'action avec `/bc ...`, ajoute une entree dans :
-
-- `BotControl.ACTION_COMMAND_ALIASES` dans `BotControl.lua`
-
-Exemple :
-
-```lua
-MyNewAction = {
-    "mynewaction"
-}
-```
-
-Le premier alias sert de forme canonique pour l'aide affichee via `/bc help`.
-
-Si tu n'ajoutes rien, la resolution essaiera quand meme le nom interne de l'action, mais ajouter un alias explicite est plus propre pour garder des commandes courtes et previsibles.
-
-### 8. Resize automatique
-
-Le resize des sous-onglets `Actions` depend du nombre d'elements dans :
-
-- `BotControl_ActionConfigElements`
-- `BotControl_ActionCombatElements`
-
-Le calcul est fait dans :
-
-- `BotControl_UpdateFrameSizeForView(mainTab, subTab)` dans `BotControl.lua`
-
-Donc si tu ajoutes correctement ton bouton au bon groupe, le resize suivra automatiquement.
-
-### 9. Cas special : action en file d'attente
-
-`InitBots` est encore un cas particulier.
-
-Pourquoi :
-
-- cette action envoie beaucoup de commandes slash a la suite
-- elle passe par `BotControl.RunCommandsQueued(...)`
-
-Fonctions utiles :
-
-- `BotControl.RunCommands(commands)`
-- `BotControl.RunCommandsQueued(commands)`
-
-Regle simple :
-
-- action normale : flux standard via `RunAction(...)`
-- action lourde avec beaucoup de slashs : utiliser eventuellement `RunCommandsQueued(...)`
-
-## Modifier un bouton d'action existant
-
-Pour modifier un bouton deja present, les points d'entree sont :
-
-### Changer l'icone ou le tooltip
-
-- `BotControl.ACTION_BUTTON_CONFIG` dans `BotControl.lua`
-
-### Changer le sous-onglet d'affichage
-
-- `BotControl.RegisterTabElements(frame)` dans `BotControl.lua`
-
-Il faut le retirer d'un groupe et l'ajouter dans l'autre :
-
-- `BotControl_ActionConfigElements`
-- `BotControl_ActionCombatElements`
-
-### Changer sa position
-
-- `BotControl_LayoutButtons()` dans `BotControl.lua`
-
-### Changer sa logique
-
-- `BotControlActions.definitions` dans `BotControl_Actions.lua`
-- la fonction `...Commands()` correspondante
-
-### Changer un comportement special
-
-- `BotControl_RunNamedAction()` dans `BotControl.lua`
-- eventuellement la fonction wrapper correspondante dans `BotControl_Actions.lua`
-
-## Resume ultra court
-
-Pour ajouter un bouton d'action :
-
-1. `BotControl.lua`
-   Ajouter l'entree dans `ACTION_BUTTON_CONFIG`
-2. `BotControl.lua`
-   Creer le bouton dans `BotControl.CreateButtons(frame)`
-3. `BotControl.lua`
-   Le styliser dans `BotControl.StyleActionButtons()`
-4. `BotControl.lua`
-   L'ajouter dans `BotControl_ActionElements`
-5. `BotControl.lua`
-   L'ajouter dans `BotControl_ActionConfigElements` ou `BotControl_ActionCombatElements`
-6. `BotControl.lua`
-   Le positionner dans `BotControl_LayoutButtons()`
-7. `BotControl_Actions.lua`
-   Ajouter l'entree dans `BotControlActions.definitions`
-8. `BotControl_Actions.lua`
-   Ajouter la fonction `...Commands()`
-9. `BotControl.lua`
-   Verifier si `BotControl_RunNamedAction()` a besoin d'un cas special
-
-## Exemple minimal complet
-
-Si tu veux ajouter un bouton `Dance` dans `Combat` :
-
-- `BotControl.lua`
-  Ajouter `Dance` dans `ACTION_BUTTON_CONFIG`
-- `BotControl.lua`
-  Creer `BotControlDanceButton`
-- `BotControl.lua`
-  L'ajouter dans `StyleActionButtons()`
-- `BotControl.lua`
-  L'ajouter dans `BotControl_ActionElements`
-- `BotControl.lua`
-  L'ajouter dans `BotControl_ActionCombatElements`
-- `BotControl.lua`
-  Le placer dans le layout `Combat`
-- `BotControl_Actions.lua`
-  Ajouter :
-
-```lua
-Dance = {
-    label = "Dance",
-    builder = "DanceCommands"
-}
-```
-
-- `BotControl_Actions.lua`
-  Ajouter :
-
-```lua
-function BotControlActions:DanceCommands()
-    local commands = {}
-
-    AddParty(commands, "dance")
-
-    return commands
-end
-```
-
-Dans ce cas, pas besoin de modifier `BotControl_RunNamedAction()` si tu restes sur le flux standard.
+C'est tout.
+
+Le bouton sera :
+
+- cree automatiquement
+- stylise automatiquement
+- visible dans le bon sous-onglet
+- place automatiquement dans le layout
+- disponible via `/bc mynewaction`
+
+## Champs utiles du registre
+
+- `key`
+  Cle interne unique.
+- `label`
+  Texte logique du bouton.
+- `tooltipTitle`
+  Titre du tooltip.
+- `tooltipDescription`
+  Description du tooltip.
+- `texture`
+  Texture d'icone.
+- `tab`
+  `Config` ou `Combat`.
+- `group`
+  `Config`, `Tank`, `DPS`, `Heal` ou `All`.
+- `order`
+  Ordre d'affichage.
+- `aliases`
+  Alias slash explicites.
+- `builder`
+  Nom de la fonction `...Commands()`.
+- `queued`
+  Utilise `RunCommandsQueued`.
+- `sequence`
+  Sequence d'actions au lieu d'un builder direct.
+- `buttonName`
+  Optionnel. Sert seulement a rebrancher un bouton historique deja nomme autrement.
+
+## Compatibilite
+
+La refonte conserve :
+
+- la compatibilite WoW 2.4.3 / Lua 5.1
+- les builders existants
+- les sous-onglets `Config` et `Combat`
+- les groupes visuels `Tank / DPS / Heal / All`
+- les slash commands `/bc ...`
+- la normalisation des alias
+- les wrappers globaux `BotControl_Action_<Key>`
+- les noms globaux de boutons historiques quand ils existent deja
+
+Les boutons historiques definis en XML sont reutilises.
+Les nouveaux boutons suivent par defaut la convention :
+
+- `BotControl<Key>Button`
+
+## Actions actuellement declarees
+
+Config :
+
+- `ComposeGroup`
+- `Build`
+- `Init`
+- `FullSetup`
+- `Summon`
+- `InitBots`
+
+Combat :
+
+- `TankAttack`
+- `AttackDPS`
+- `PassiveDPS`
+- `Follow`
+- `Passive`
+- `Stay`
+- `Used`

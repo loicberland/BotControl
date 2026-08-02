@@ -235,8 +235,6 @@ Le bouton sera :
   Utilise `RunCommandsQueued`.
 - `sequence`
   Sequence d'actions au lieu d'un builder direct.
-- `buttonName`
-  Optionnel. Sert seulement a rebrancher un bouton historique deja nomme autrement.
 
 ## Compatibilite
 

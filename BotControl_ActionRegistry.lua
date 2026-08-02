@@ -12,8 +12,7 @@ BotControl.ActionRegistry = {
         order = 10,
         aliases = { "compose", "composegroup" },
         builder = "ComposeGroupCommands",
-        queued = false,
-        buttonName = "BotControlFrameComposeGroupButton"
+        queued = false
     },
     {
         key = "Build",
@@ -26,49 +25,7 @@ BotControl.ActionRegistry = {
         order = 20,
         aliases = { "build" },
         builder = "BuildCommands",
-        queued = false,
-        buttonName = "BotControlFrameBuildButton"
-    },
-    {
-        key = "Init",
-        label = "Initialiser",
-        tooltipTitle = "Initialiser",
-        tooltipDescription = "Applique la configuration de base des bots",
-        texture = "Interface\\Icons\\INV_Misc_Book_09",
-        tab = "Config",
-        group = "Config",
-        order = 30,
-        aliases = { "init" },
-        builder = "InitCommands",
-        queued = false,
-        buttonName = "BotControlFrameInitButton"
-    },
-    {
-        key = "FullSetup",
-        label = "Preparation complete",
-        tooltipTitle = "Preparation complete",
-        tooltipDescription = "Lance Build, Init",
-        texture = "Interface\\Icons\\Spell_Holy_BlessingOfStamina",
-        tab = "Config",
-        group = "Config",
-        order = 40,
-        aliases = { "fullsetup", "full setup" },
-        sequence = { "Build", "Init" },
         queued = false
-    },
-    {
-        key = "Summon",
-        label = "Invocation",
-        tooltipTitle = "Invocation",
-        tooltipDescription = "Invoque tous les bots configures",
-        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
-        tab = "Config",
-        group = "Config",
-        order = 50,
-        aliases = { "summon" },
-        builder = "SummonCommands",
-        queued = false,
-        buttonName = "BotControlFrameSummonButton"
     },
     {
         key = "InitBots",
@@ -78,10 +35,62 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\INV_Misc_Gear_01",
         tab = "Config",
         group = "Config",
-        order = 60,
+        order = 30,
         aliases = { "initbots", "init bots" },
         builder = "InitBotsCommands",
         queued = true
+    },
+    {
+        key = "Init",
+        label = "Initialiser",
+        tooltipTitle = "Initialiser",
+        tooltipDescription = "Applique la configuration de base des bots",
+        texture = "Interface\\Icons\\INV_Misc_Book_09",
+        tab = "Config",
+        group = "Config",
+        order = 40,
+        aliases = { "init" },
+        builder = "InitCommands",
+        queued = true
+    },
+    {
+        key = "InitTank",
+        label = "Initialiser les tank",
+        tooltipTitle = "Initialiser les tank",
+        tooltipDescription = "Applique la configuration de base des bots tank",
+        texture = "Interface\\Icons\\Ability_Warrior_DefensiveStance.blp",
+        tab = "Config",
+        group = "Config",
+        order = 41,
+        aliases = { "initTank" },
+        builder = "InitCommandsTank",
+        queued = true
+    },
+    {
+        key = "InitHeal",
+        label = "Initialiser les heal",
+        tooltipTitle = "Initialiser les heal",
+        tooltipDescription = "Applique la configuration de base des botsheal",
+        texture = "Interface\\Icons\\Spell_Holy_Heal.blp",
+        tab = "Config",
+        group = "Config",
+        order = 42,
+        aliases = { "initHeal" },
+        builder = "InitCommandsHeal",
+        queued = true
+    },
+    {
+        key = "Summon",
+        label = "Invocation",
+        tooltipTitle = "Invocation",
+        tooltipDescription = "Invoque tous les bots configures",
+        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
+        tab = "Config",
+        group = "Config",
+        order = 100,
+        aliases = { "summon" },
+        builder = "SummonCommands",
+        queued = false
     },
     {
         key = "TankAttack",
@@ -94,8 +103,7 @@ BotControl.ActionRegistry = {
         order = 10,
         aliases = { "tankattack", "tank attack" },
         builder = "TankAttackCommands",
-        queued = false,
-        buttonName = "BotControlFrameTankAttackButton"
+        queued = false
     },
     {
         key = "AttackDPS",
@@ -121,6 +129,45 @@ BotControl.ActionRegistry = {
         order = 20,
         aliases = { "passivedps", "passive dps" },
         builder = "PassiveDPSCommands",
+        queued = false
+    },
+    {
+        key = "WaitDPS",
+        label = "Wait DPS",
+        tooltipTitle = "Wait DPS",
+        tooltipDescription = "Ordre uniquement aux DPS d'attendre avant d'attaquer",
+        texture = "Interface\\Icons\\Spell_Shadow_LastingAfflictions",
+        tab = "Combat",
+        group = "DPS",
+        order = 30,
+        aliases = { "waitdps"},
+        builder = "WaitDPSCommands",
+        queued = false
+    },
+    {
+        key = "Kick",
+        label = "Kick",
+        tooltipTitle = "Kick",
+        tooltipDescription = "Kick le sort de la cible",
+        texture = "Interface\\Icons\\Ability_Kick",
+        tab = "Combat",
+        group = "DPS",
+        order = 40,
+        aliases = { "kick" },
+        builder = "KickCommands",
+        queued = false
+    },
+    {
+        key = "WaitHEAL",
+        label = "Wait HEAL",
+        tooltipTitle = "Wait HEAL",
+        tooltipDescription = "Ordre uniquement aux HEAL d'attendre avant d'attaquer",
+        texture = "Interface\\Icons\\Spell_Shadow_LastingAfflictions",
+        tab = "Combat",
+        group = "Heal",
+        order = 10,
+        aliases = { "waitheal"},
+        builder = "WaitHEALCommands",
         queued = false
     },
     {
@@ -173,6 +220,19 @@ BotControl.ActionRegistry = {
         order = 40,
         aliases = { "used" },
         builder = "UsedCommands",
+        queued = false
+    },
+    {
+        key = "Rez",
+        label = "ressuscite",
+        tooltipTitle = "ressuscite",
+        tooltipDescription = "ressuscite tous les joueurs",
+        texture = "Interface\\Icons\\Spell_Holy_Resurrection",
+        tab = "Combat",
+        group = "All",
+        order = 50,
+        aliases = { "rez" },
+        builder = "RezCommands",
         queued = false
     }
 }

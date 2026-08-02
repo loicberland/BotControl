@@ -8,13 +8,19 @@ local function AddCommand(commands, command)
     end
 end
 
-local function AddWhisper(commands, target, message)
+local function AddWhisper(commands, target, message, delayAfter)
+    local command
+
     if BotControl.HasValue(target) and BotControl.HasValue(message) then
-        table.insert(commands, {
+        command = {
             type = "WHISPER",
             target = target,
             message = message
-        })
+        }
+        if type(delayAfter) == "number" and delayAfter > 0 then
+            command.delayAfter = delayAfter
+        end
+        table.insert(commands, command)
     end
 end
 
@@ -52,15 +58,15 @@ local function AddUniqueName(target, name)
     table.insert(target, name)
 end
 
-local function AddWhisperList(commands, names, message)
+local function AddWhisperList(commands, names, message, delayAfter)
     local index
 
     for index = 1, table.getn(names) do
-        AddWhisper(commands, names[index], message)
+        AddWhisper(commands, names[index], message, delayAfter)
     end
 end
 
-local function AddWhisperByRoleAndClass(commands, slots, roleName, className, message)
+local function AddWhisperByRoleAndClass(commands, slots, roleName, className, message, delayAfter)
     local index
     local slot
 
@@ -71,7 +77,23 @@ local function AddWhisperByRoleAndClass(commands, slots, roleName, className, me
     for index = 1, table.getn(slots) do
         slot = slots[index]
         if slot and slot.role == roleName and slot.class == className and BotControl.HasValue(slot.name) then
-            AddWhisper(commands, slot.name, message)
+            AddWhisper(commands, slot.name, message, delayAfter)
+        end
+    end
+end
+
+local function AddWhisperByClass(commands, slots, className, message, delayAfter)
+    local index
+    local slot
+
+    if type(slots) ~= "table" then
+        return
+    end
+
+    for index = 1, table.getn(slots) do
+        slot = slots[index]
+        if slot and slot.class == className and BotControl.HasValue(slot.name) then
+            AddWhisper(commands, slot.name, message, delayAfter)
         end
     end
 end
@@ -143,6 +165,14 @@ local function ReplaceRoleTokenInText(text, roleName, replacement)
     end
 
     return string.gsub(text, "%{" .. roleName .. "%}", replacement)
+end
+
+local function ReplaceNamedTokenInText(text, tokenName, replacement)
+    if type(text) ~= "string" then
+        return text
+    end
+
+    return string.gsub(text, "%{" .. tokenName .. "%}", replacement or "")
 end
 
 local function CommandContainsRoleToken(command, roleName)
@@ -224,12 +254,67 @@ local function ExpandCommandsByRoleTokens(commands, cfg)
     return expanded
 end
 
+local function ExpandCommandsByNamedTokens(commands, replacements)
+    local expanded = {}
+    local index
+    local key
+    local value
+    local copy
+    local command
+
+    for index = 1, table.getn(commands) do
+        command = commands[index]
+
+        if type(command) == "string" then
+            copy = command
+            for key, value in pairs(replacements) do
+                copy = ReplaceNamedTokenInText(copy, key, value)
+            end
+            table.insert(expanded, copy)
+        elseif type(command) == "table" then
+            copy = CopyCommand(command)
+            for key, value in pairs(copy) do
+                if type(value) == "string" then
+                    local replacementKey
+                    local replacementValue
+
+                    for replacementKey, replacementValue in pairs(replacements) do
+                        value = ReplaceNamedTokenInText(value, replacementKey, replacementValue)
+                    end
+
+                    copy[key] = value
+                end
+            end
+            table.insert(expanded, copy)
+        else
+            table.insert(expanded, command)
+        end
+    end
+
+    return expanded
+end
+
 function BotControlActions:GetConfig()
-    return BuildActionConfig()
+    local cfg = BuildActionConfig()
+
+    cfg.playerName = UnitName("player") or ""
+    if UnitExists and UnitExists("target") then
+        cfg.targetName = UnitName("target") or ""
+    else
+        cfg.targetName = ""
+    end
+
+    return cfg
 end
 
 function BotControlActions:PrepareCommands(commands)
-    return ExpandCommandsByRoleTokens(commands or {}, self:GetConfig())
+    local cfg = self:GetConfig()
+    local expanded = ExpandCommandsByRoleTokens(commands or {}, cfg)
+
+    return ExpandCommandsByNamedTokens(expanded, {
+        player = cfg.playerName,
+        target = cfg.targetName
+    })
 end
 
 function BotControlActions:BuildCommands()
@@ -251,30 +336,59 @@ end
 function BotControlActions:InitCommands()
     local cfg = self:GetConfig()
     local commands = {}
+    local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
     AddSlash(commands, "/run SetLootMethod('master', UnitName('player'))")
-    AddParty(commands, "ll -equip,-quest,-skill,-disenchant,-use,-vendor,-trash")
-    AddParty(commands, "stance near")
-    AddParty(commands, "rti cc none")
-    AddParty(commands, "nc -loot")
+    AddParty(commands, "ll -equip,-quest,-skill,-disenchant,-use,-vendor,-trash", whisperDelay)
+    AddParty(commands, "stance near", whisperDelay)
+    AddParty(commands, "formation arrow", whisperDelay)
+    AddParty(commands, "rti cc none", whisperDelay)
+    AddParty(commands, "nc -loot", whisperDelay)
+    AddParty(commands, "save mana 3", whisperDelay)
+    AddParty(commands, "follow", whisperDelay)
+    AddParty(commands, "pet defensive", whisperDelay)
+    AddParty(commands, "co -cc", whisperDelay)
+    AddParty(commands, "nc -grind", whisperDelay)
+    AddWhisperByClass(commands, cfg.namedSlots, "Chasseur", "ss growl")
+    
     -- AddParty(commands, "nc +passive")
     -- AddParty(commands, "co -passive")
-    AddParty(commands, "save mana 3")
-    AddParty(commands, "follow")
-    AddParty(commands, "pet defensive")
-    AddParty(commands, "co -cc")
-    AddWhisperList(commands, cfg.roleNames.heal, "co -offdps")
-    -- AddWhisperByRoleAndClass(commands, cfg.namedSlots, "dps", "Mage", "co +cc,?")
-    AddWhisperList(commands, cfg.roleNames.heal, "nc -offdps")
-    AddWhisperList(commands, cfg.roleNames.heal, "save mana 2")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "co -offdps,?")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "nc -offdps,?")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "save mana 2")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "co +aoe,?")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "nc +aoe,?")
 
-    AddWhisperList(commands, cfg.roleNames.tank, "stance tank")
-    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti")
-    -- AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
+    -- AddWhisperList(commands, cfg.roleNames.tank, "stance tank")
+    -- AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti,?")
+    -- AddWhisperList(commands, cfg.roleNames.heal, "co -wait for attack")
     -- AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
-    -- AddWhisperList(commands, cfg.roleNames.dps, "co +wait for attack")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "co -wait for attack")
     -- AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 5")
+    
+    -- AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "ss divine protection")
+    -- AddWhisperByClass(commands, cfg.namedSlots, "Chaman", "ss bloodlust")
+    return commands
+end
 
+function BotControlActions:InitCommandsTank()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
+
+    AddWhisperList(commands, cfg.roleNames.tank, "stance tank", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti,?", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "ss divine protection", whisperDelay)
+    return commands
+end
+
+function BotControlActions:InitCommandsHeal()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
+    AddWhisperList(commands, cfg.roleNames.heal, "save mana 2", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "co -offdps", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "co +aoe", whisperDelay)
     return commands
 end
 
@@ -296,8 +410,7 @@ function BotControlActions:TankAttackCommands()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.tank, "attack")
-    -- AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
-    -- AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 10")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "cast avenger's shield")
 
     return commands
 end
@@ -307,11 +420,11 @@ function BotControlActions:AttackDPSCommands()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
-    AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")    
-    AddParty(commands, "pet defensive")
-    AddParty(commands, "free")
+    AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")   
+    AddWhisperList(commands, cfg.roleNames.dps, "free")
     AddWhisperList(commands, cfg.roleNames.dps, "attack")
-    AddParty(commands, "pet attack")
+    AddWhisperList(commands, cfg.roleNames.dps, "pet defensive")
+    AddWhisperList(commands, cfg.roleNames.dps, "pet attack")
 
     return commands
 end
@@ -345,6 +458,26 @@ function BotControlActions:PassiveDPSCommands()
     return commands
 end
 
+function BotControlActions:WaitDPSCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.dps, "co +wait for attack")
+    AddWhisperList(commands, cfg.roleNames.dps, "wait for attack time 4")
+
+    return commands
+end
+
+function BotControlActions:WaitHEALCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
+    AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
+
+    return commands
+end
+
 function BotControlActions:StayCommands()
     local commands = {}
 
@@ -357,6 +490,31 @@ function BotControlActions:UsedCommands()
     local commands = {}
 
     AddParty(commands, "u go")
+
+    return commands
+end
+
+function BotControlActions:KickCommands()
+    local commands = {}
+    local cfg = self:GetConfig()
+
+    AddWhisperByClass(commands, cfg.namedSlots, "Mage", "cast counterspell")
+
+    return commands
+end
+
+function BotControlActions:RezCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local index
+    local name
+
+    for index = 1, table.getn(cfg.names) do
+        name = cfg.names[index]
+        AddWhisper(commands, name, ".revive " .. name)
+    end
+
+    AddWhisper(commands, name, ".revive " .. cfg.playerName)
 
     return commands
 end

@@ -6,6 +6,9 @@ BotControl_ActionConfigElements = {}
 BotControl_ActionCombatElements = {}
 BotControl_ActionCombatDecorElements = {}
 BotControl.ActionButtons = BotControl.ActionButtons or {}
+BotControl.activeBotNameEditBox = nil
+BotControl.activeBotNameSlotIndex = nil
+BotControl.hasChatLinkHook = false
 BotControl.selectedProfileName = nil
 BotControl.selectedProfileNamesByFormat = {}
 BotControl_SelectedProfileName = nil
@@ -17,6 +20,8 @@ BotControl.PROFILES_FRAME_WIDTH = 595
 BotControl.PROFILES_FRAME_HEIGHT = 350
 BotControl.ACTIONS_CONFIG_FRAME_WIDTH = 400
 BotControl.ACTIONS_COMBAT_FRAME_WIDTH = 560
+BotControl.ACTIONS_CONFIG_BUTTONS_PER_ROW = 7
+BotControl.ACTIONS_COMBAT_BUTTONS_PER_ROW = 2
 BotControl.ACTIONS_BASE_HEIGHT = 146
 BotControl.ACTIONS_ICON_SIZE = 36
 BotControl.ACTIONS_ICON_SPACING = 12
@@ -24,7 +29,9 @@ BotControl.ACTIONS_ROW_SPACING = 16
 BotControl.ACTIONS_ICONS_PER_ROW = 3
 BotControl.ACTIONS_COMBAT_MIN_ROWS = 4
 BotControl.COMMAND_INTERVAL = 0.15
+BotControl.REPEAT_WHISPER_INTERVAL = 0.4
 BotControl.commandQueue = {}
+BotControl.commandQueueInterval = BotControl.COMMAND_INTERVAL
 BotControl.MAX_PROFILE_SLOTS = 25
 BotControl.PROFILE_SLOT_ROWS = 5
 BotControl.PROFILE_SLOT_TOP_OFFSET = -102
@@ -934,6 +941,174 @@ function BotControl.Print(message)
     end
 end
 
+function BotControl.SetActiveBotNameField(editBox)
+    if editBox and editBox.isBotControlBotNameField then
+        BotControl.activeBotNameEditBox = editBox
+        BotControl.activeBotNameSlotIndex = editBox.slotIndex
+    end
+end
+
+function BotControl.NormalizeBotNameFromChat(name)
+    name = BotControl.Trim(name or "")
+    if not BotControl.HasValue(name) then
+        return nil
+    end
+
+    name = string.gsub(name, "|c%x%x%x%x%x%x%x%x", "")
+    name = string.gsub(name, "|r", "")
+    name = string.gsub(name, "|H.-|h", "")
+    name = string.gsub(name, "|h", "")
+    name = string.gsub(name, "[%[%]]", "")
+    name = BotControl.Trim(name)
+
+    if string.find(name, "-", 1, true) then
+        name = string.match(name, "^[^%-]+") or name
+    end
+
+    name = BotControl.Trim(name)
+    if not BotControl.HasValue(name) then
+        return nil
+    end
+
+    return name
+end
+
+function BotControl.ExtractPlayerNameFromChatLink(link, text)
+    local name
+
+    if type(link) == "string" then
+        name = string.match(link, "^player:([^:]+)")
+        if BotControl.HasValue(name) then
+            return BotControl.NormalizeBotNameFromChat(name)
+        end
+    end
+
+    if type(text) == "string" then
+        name = string.match(text, "|Hplayer:([^:|]+)")
+        if not BotControl.HasValue(name) then
+            name = text
+        end
+
+        return BotControl.NormalizeBotNameFromChat(name)
+    end
+
+    return nil
+end
+
+function BotControl.FocusNextBotNameField(currentSlotIndex)
+    local frame = BotControlFrame
+    local slotCount = BotControl.GetProfileSlotCount(BotControl.GetActiveProfileFormat())
+    local slotField
+    local slotIndex
+
+    if not frame or not frame.profileSlotFields then
+        return false
+    end
+
+    for slotIndex = (currentSlotIndex or 0) + 1, slotCount do
+        slotField = frame.profileSlotFields[slotIndex]
+        if slotField and slotField.editBox and slotField.editBox:IsVisible() then
+            BotControl.SetActiveBotNameField(slotField.editBox)
+            slotField.editBox:SetFocus()
+            if slotField.editBox.HighlightText then
+                slotField.editBox:HighlightText()
+            end
+            return true
+        end
+    end
+
+    if BotControl.activeBotNameEditBox and BotControl.activeBotNameEditBox.ClearFocus then
+        BotControl.activeBotNameEditBox:ClearFocus()
+    end
+
+    return false
+end
+
+function BotControl.InsertBotNameFromChat(name)
+    local editBox = BotControl.activeBotNameEditBox
+    local slotIndex = BotControl.activeBotNameSlotIndex
+
+    name = BotControl.NormalizeBotNameFromChat(name)
+    if not BotControl.HasValue(name) then
+        return false
+    end
+
+    if BotControl.currentTab ~= "Profiles" then
+        return false
+    end
+
+    if not BotControlFrame or not BotControlFrame:IsShown() then
+        return false
+    end
+
+    if not editBox or not editBox.isBotControlBotNameField or not editBox.slotIndex then
+        return false
+    end
+
+    if not editBox:IsVisible() then
+        return false
+    end
+
+    editBox:SetText(name)
+    if editBox.HighlightText then
+        editBox:HighlightText(0, 0)
+    end
+    if editBox.SetCursorPosition then
+        editBox:SetCursorPosition(string.len(name))
+    end
+
+    BotControl.Print("Bot " .. slotIndex .. " = " .. name)
+    BotControl.FocusNextBotNameField(slotIndex)
+
+    return true
+end
+
+function BotControl.SetupChatLinkHook()
+    if BotControl.hasChatLinkHook then
+        return
+    end
+
+    if type(hooksecurefunc) == "function" then
+        hooksecurefunc("SetItemRef", function(link, text, button)
+            local name
+
+            if type(IsShiftKeyDown) ~= "function" or not IsShiftKeyDown() then
+                return
+            end
+
+            if button ~= "LeftButton" then
+                return
+            end
+
+            name = BotControl.ExtractPlayerNameFromChatLink(link, text)
+            if name then
+                BotControl.InsertBotNameFromChat(name)
+            end
+        end)
+
+        BotControl.hasChatLinkHook = true
+        return
+    end
+
+    if type(SetItemRef) == "function" then
+        BotControl.originalSetItemRef = BotControl.originalSetItemRef or SetItemRef
+        SetItemRef = function(link, text, button)
+            local name
+
+            if type(IsShiftKeyDown) == "function" and IsShiftKeyDown() and button == "LeftButton" then
+                name = BotControl.ExtractPlayerNameFromChatLink(link, text)
+                if name and BotControl.InsertBotNameFromChat(name) then
+                    return
+                end
+            end
+
+            return BotControl.originalSetItemRef(link, text, button)
+        end
+
+        BotControl.hasChatLinkHook = true
+    end
+end
+
 function BotControl.Toggle()
     if not BotControlFrame then
         return
@@ -1183,6 +1358,18 @@ function BotControl.CreateProfileSlotField(parent, slotIndex)
         editWidth = BotControl.PROFILE_SLOT_NAME_WIDTH
     })
 
+    nameField.editBox.isBotControlBotNameField = true
+    nameField.editBox.slotIndex = slotIndex
+    nameField.editBox:SetScript("OnEditFocusGained", function(self)
+        BotControl.SetActiveBotNameField(self)
+    end)
+    nameField.editBox:SetScript("OnEditFocusLost", function(self)
+        if self and self.isBotControlBotNameField then
+            BotControl.activeBotNameEditBox = self
+            BotControl.activeBotNameSlotIndex = self.slotIndex
+        end
+    end)
+
     specField = BotControl.CreateClassSpecField(parent, {
         key = specKey,
         roleKey = roleKey,
@@ -1308,6 +1495,37 @@ function BotControl.AddElement(targetTable, element)
     table.insert(targetTable, element)
 end
 
+function BotControl.GetActionRowsForCount(iconCount, buttonsPerRow)
+    buttonsPerRow = buttonsPerRow or 1
+    if buttonsPerRow < 1 then
+        buttonsPerRow = 1
+    end
+
+    if not iconCount or iconCount < 1 then
+        return 0
+    end
+
+    return math.ceil(iconCount / buttonsPerRow)
+end
+
+function BotControl.GetCombatMaxActionRows()
+    local groups = { "Tank", "DPS", "Heal", "All" }
+    local maxRows = 0
+    local groupActions
+    local rows
+    local index
+
+    for index = 1, table.getn(groups) do
+        groupActions = BotControl.GetActionsForGroup and BotControl.GetActionsForGroup("Combat", groups[index]) or {}
+        rows = BotControl.GetActionRowsForCount(table.getn(groupActions), BotControl.ACTIONS_COMBAT_BUTTONS_PER_ROW)
+        if rows > maxRows then
+            maxRows = rows
+        end
+    end
+
+    return maxRows
+end
+
 function BotControl_UpdateFrameSizeForView(mainTab, subTab)
     local frame = BotControlFrame
     local width
@@ -1343,7 +1561,12 @@ function BotControl_UpdateFrameSizeForView(mainTab, subTab)
             end
         end
 
-        rows = math.ceil(iconCount / BotControl.ACTIONS_ICONS_PER_ROW)
+        if subTab == "Combat" then
+            rows = BotControl.GetCombatMaxActionRows()
+        else
+            rows = BotControl.GetActionRowsForCount(iconCount, BotControl.ACTIONS_CONFIG_BUTTONS_PER_ROW)
+        end
+
         if subTab == "Combat" and rows < BotControl.ACTIONS_COMBAT_MIN_ROWS then
             rows = BotControl.ACTIONS_COMBAT_MIN_ROWS
         end
@@ -1705,31 +1928,7 @@ function BotControl.GetActionButtonName(action)
         return nil
     end
 
-    if BotControl.HasValue(action.buttonName) then
-        return action.buttonName
-    end
-
     return "BotControl" .. action.key .. "Button"
-end
-
-function BotControl.GetActionButtonAliases(action)
-    local aliases = {}
-    local primaryName
-
-    if type(action) ~= "table" then
-        return aliases
-    end
-
-    primaryName = BotControl.GetActionButtonName(action)
-    if BotControl.HasValue(primaryName) then
-        table.insert(aliases, primaryName)
-    end
-
-    if primaryName ~= "BotControl" .. action.key .. "Button" then
-        table.insert(aliases, "BotControl" .. action.key .. "Button")
-    end
-
-    return aliases
 end
 
 function BotControl.GetActionButton(actionKey)
@@ -2007,8 +2206,6 @@ function BotControl.CreateActionButtons(frame)
     local index
     local action
     local button
-    local globalNames
-    local nameIndex
     local buttonName
 
     if not frame then
@@ -2035,11 +2232,7 @@ function BotControl.CreateActionButtons(frame)
         end)
 
         BotControl.ActionButtons[actionKey] = button
-
-        globalNames = BotControl.GetActionButtonAliases(action)
-        for nameIndex = 1, table.getn(globalNames) do
-            _G[globalNames[nameIndex]] = button
-        end
+        _G[buttonName] = button
     end
 end
 
@@ -2456,6 +2649,11 @@ function BotControl_LayoutButtons()
     local groupName
     local groupActions
     local baseButtonX
+    local buttonX
+    local buttonPerRow
+    local groupButtonSpacingX
+    local groupButtonRowWidth
+    local groupButtonInsetX
     local column
     local row
     local stepY = BotControl.ACTIONS_ICON_SIZE + rowSpacing
@@ -2655,14 +2853,21 @@ function BotControl_LayoutButtons()
         for groupIndex = 1, table.getn(actionGroups) do
             groupName = actionGroups[groupIndex]
             groupActions = BotControl.GetActionsForGroup and BotControl.GetActionsForGroup("Combat", groupName) or {}
-            baseButtonX = combatColumnLeft + ((groupIndex - 1) * combatColumnWidth) + (combatColumnWidth * 0.5)
+            baseButtonX = combatColumnLeft + ((groupIndex - 1) * combatColumnWidth)
+            buttonPerRow = BotControl.ACTIONS_COMBAT_BUTTONS_PER_ROW
+            groupButtonSpacingX = BotControl.ACTIONS_ICON_SIZE + 10
+            groupButtonRowWidth = BotControl.ACTIONS_ICON_SIZE + ((buttonPerRow - 1) * groupButtonSpacingX)
+            groupButtonInsetX = math.floor((combatColumnWidth - groupButtonRowWidth) / 2)
 
             for index = 1, table.getn(groupActions) do
                 action = groupActions[index]
                 button = BotControl.GetActionButton(action.key)
+                column = index - 1 - (math.floor((index - 1) / buttonPerRow) * buttonPerRow)
+                row = math.floor((index - 1) / buttonPerRow)
+                buttonX = baseButtonX + groupButtonInsetX + (column * groupButtonSpacingX)
 
                 if button then
-                    button:SetPoint("TOP", frame, "TOPLEFT", baseButtonX, combatButtonStartY - ((index - 1) * stepY))
+                    button:SetPoint("TOPLEFT", frame, "TOPLEFT", buttonX, combatButtonStartY - (row * stepY))
                 end
             end
         end
@@ -2690,11 +2895,12 @@ function BotControl_LayoutButtons()
         end
 
         groupActions = BotControl.GetActionsForTab and BotControl.GetActionsForTab("Config") or {}
-        for index = 1, table.getn(groupActions) do
+        for index = 1, table.getn(groupActions) do            
+            buttonPerRow = BotControl.ACTIONS_CONFIG_BUTTONS_PER_ROW
             action = groupActions[index]
             button = BotControl.GetActionButton(action.key)
-            column = index - 1 - (math.floor((index - 1) / 4) * 4)
-            row = math.floor((index - 1) / 4)
+            column = index - 1 - (math.floor((index - 1) / buttonPerRow) * buttonPerRow)
+            row = math.floor((index - 1) / buttonPerRow)
 
             if button then
                 if actionsAnchor then
@@ -2796,27 +3002,56 @@ function BotControl.ExecuteCommandNow(command)
     end
 end
 
+function BotControl.GetCommandQueueInterval(command, nextCommand)
+    local interval = BotControl.COMMAND_INTERVAL
+
+    if type(command) == "table"
+        and type(command.delayAfter) == "number"
+        and command.delayAfter > interval then
+        interval = command.delayAfter
+    end
+
+    if type(command) == "table"
+        and type(nextCommand) == "table"
+        and command.type == "WHISPER"
+        and nextCommand.type == "WHISPER"
+        and BotControl.HasValue(command.target)
+        and command.target == nextCommand.target
+        and BotControl.REPEAT_WHISPER_INTERVAL > interval then
+        interval = BotControl.REPEAT_WHISPER_INTERVAL
+    end
+
+    return interval
+end
+
 function BotControl.ProcessCommandQueue()
     local command
+    local nextCommand
 
     if not BotControl.commandQueue or table.getn(BotControl.commandQueue) == 0 then
+        BotControl.commandQueueInterval = BotControl.COMMAND_INTERVAL
         commandQueueFrame:Hide()
         return
     end
 
     command = table.remove(BotControl.commandQueue, 1)
     BotControl.ExecuteCommandNow(command)
+    nextCommand = BotControl.commandQueue[1]
+    BotControl.commandQueueInterval = BotControl.GetCommandQueueInterval(command, nextCommand)
 
     if table.getn(BotControl.commandQueue) == 0 then
+        BotControl.commandQueueInterval = BotControl.COMMAND_INTERVAL
         commandQueueFrame:Hide()
     end
 end
 
 commandQueueFrame.elapsed = 0
 commandQueueFrame:SetScript("OnUpdate", function()
+    local interval = BotControl.commandQueueInterval or BotControl.COMMAND_INTERVAL
+
     commandQueueFrame.elapsed = commandQueueFrame.elapsed + arg1
 
-    if commandQueueFrame.elapsed < BotControl.COMMAND_INTERVAL then
+    if commandQueueFrame.elapsed < interval then
         return
     end
 
@@ -2834,8 +3069,11 @@ function BotControl.QueueCommand(command)
     end
 
     table.insert(BotControl.commandQueue, command)
-    commandQueueFrame.elapsed = BotControl.COMMAND_INTERVAL
-    commandQueueFrame:Show()
+    if not commandQueueFrame:IsShown() then
+        BotControl.commandQueueInterval = BotControl.COMMAND_INTERVAL
+        commandQueueFrame.elapsed = BotControl.commandQueueInterval
+        commandQueueFrame:Show()
+    end
 end
 
 function BotControl.RunCommands(commands)
@@ -2991,6 +3229,7 @@ function BotControl.HandleEvent()
         BotControlConfig:Initialize()
         BotControl.EnsureProfileStorage()
         BotControl.SetupSlashCommands()
+        BotControl.SetupChatLinkHook()
     elseif event == "PLAYER_LOGIN" then
         db = BotControlConfig:GetDB()
         BotControl.EnsureProfileStorage()
@@ -3018,6 +3257,7 @@ function BotControl_OnLoad(frame)
 
     BotControlConfig:Initialize()
     BotControl.EnsureProfileStorage()
+    BotControl.SetupChatLinkHook()
     db = BotControlConfig:GetDB()
     BotControl.InitializeFrame(frame)
     BotControl_LayoutButtons()

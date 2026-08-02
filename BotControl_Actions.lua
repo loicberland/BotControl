@@ -1,5 +1,10 @@
 BotControlActions = {}
 
+BotControl = BotControl or {}
+BotControl.Compat = BotControl.Compat or {}
+BotControl.Compat.GlobalEnv = BotControl.Compat.GlobalEnv or getfenv(0)
+local GLOBAL_ENV = BotControl.Compat.GlobalEnv
+
 BotControlActions.definitions = BotControlActions.definitions or {}
 
 local function AddCommand(commands, command)
@@ -24,12 +29,18 @@ local function AddWhisper(commands, target, message, delayAfter)
     end
 end
 
-local function AddParty(commands, message)
+local function AddParty(commands, message, delayAfter)
+    local command
+
     if BotControl.HasValue(message) then
-        table.insert(commands, {
+        command = {
             type = "PARTY",
             message = message
-        })
+        }
+        if type(delayAfter) == "number" and delayAfter > 0 then
+            command.delayAfter = delayAfter
+        end
+        table.insert(commands, command)
     end
 end
 
@@ -132,13 +143,11 @@ local function BuildActionConfig()
     cfg.healName = cfg.roleNames.heal[1] or ""
     cfg.dps1Name = cfg.roleNames.dps[1] or ""
     cfg.dps2Name = cfg.roleNames.dps[2] or ""
-    cfg.dps3Name = cfg.roleNames.dps[3] or ""
 
     cfg.tankBuild = cfg.roleSlots.tank[1] and cfg.roleSlots.tank[1].spec or ""
     cfg.healBuild = cfg.roleSlots.heal[1] and cfg.roleSlots.heal[1].spec or ""
     cfg.dps1Build = cfg.roleSlots.dps[1] and cfg.roleSlots.dps[1].spec or ""
     cfg.dps2Build = cfg.roleSlots.dps[2] and cfg.roleSlots.dps[2].spec or ""
-    cfg.dps3Build = cfg.roleSlots.dps[3] and cfg.roleSlots.dps[3].spec or ""
 
     return cfg
 end
@@ -637,7 +646,7 @@ function BotControlActions.CreateLegacyActionWrappers()
     for index = 1, table.getn(orderedActions) do
         actionKey = orderedActions[index].key
         local wrappedActionKey = actionKey
-        _G["BotControl_Action_" .. actionKey] = function()
+        GLOBAL_ENV["BotControl_Action_" .. actionKey] = function()
             if BotControlActions and BotControlActions.RunAction then
                 BotControlActions:RunAction(wrappedActionKey)
             end

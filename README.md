@@ -1,6 +1,6 @@
 # BotControl
 
-Addon WoW 2.4.3 pour piloter des bots via une interface simple.
+Addon WoW 1.12.1 / Interface 11200 pour piloter des CMaNGOS PlayerBots via une interface simple.
 
 ## Structure
 
@@ -88,6 +88,14 @@ La presentation `Combat` conserve les groupes visuels :
 - `DPS`
 - `Heal`
 - `All`
+
+## Profils de groupe
+
+Chaque profil reserve sa derniere place au joueur :
+
+- `5 joueurs` : quatre emplacements de bots ;
+- `10 joueurs` : neuf emplacements de bots ;
+- `25 joueurs` : vingt-quatre emplacements de bots.
 
 Le layout est maintenant calcule a partir du registre :
 
@@ -240,7 +248,7 @@ Le bouton sera :
 
 La refonte conserve :
 
-- la compatibilite WoW 2.4.3 / Lua 5.1
+- la compatibilite WoW 1.12.1 / Lua 5.0
 - les builders existants
 - les sous-onglets `Config` et `Combat`
 - les groupes visuels `Tank / DPS / Heal / All`

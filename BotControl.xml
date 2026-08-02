@@ -110,22 +110,22 @@
                 <MaxLetters>64</MaxLetters>
                 <Scripts>
                     <OnLoad>
-                        self:SetAutoFocus(false);
-                        self:SetJustifyH("LEFT");
+                        this:SetAutoFocus(false);
+                        this:SetJustifyH("LEFT");
                     </OnLoad>
-                    <OnEscapePressed>self:ClearFocus();</OnEscapePressed>
-                    <OnEnterPressed>self:ClearFocus();</OnEnterPressed>
+                    <OnEscapePressed>this:ClearFocus();</OnEscapePressed>
+                    <OnEnterPressed>this:ClearFocus();</OnEnterPressed>
                 </Scripts>
             </EditBox>
         </Frames>
         <Scripts>
-            <OnLoad>BotControl_OnLoad(self);</OnLoad>
+            <OnLoad>BotControl_OnLoad(this);</OnLoad>
             <OnMouseDown>
                 if button == "LeftButton" then
-                    self:StartMoving();
+                    this:StartMoving();
                 end
             </OnMouseDown>
-            <OnMouseUp>self:StopMovingOrSizing();</OnMouseUp>
+            <OnMouseUp>this:StopMovingOrSizing();</OnMouseUp>
         </Scripts>
     </Frame>
 </Ui>

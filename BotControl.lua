@@ -1,4 +1,19 @@
 BotControl = BotControl or {}
+BotControl.Compat = BotControl.Compat or {}
+BotControl.Compat.GlobalEnv = BotControl.Compat.GlobalEnv or getfenv(0)
+
+function BotControl.Compat.GetGlobal(name)
+    return BotControl.Compat.GlobalEnv[name]
+end
+
+function BotControl.Compat.BindGlobal(name, value)
+    if value then
+        BotControl.Compat.GlobalEnv[name] = value
+    end
+
+    return BotControl.Compat.GlobalEnv[name]
+end
+
 BotControl_ProfileElements = {}
 BotControl_ActionElements = {}
 BotControl_ActionSubTabElements = {}
@@ -8,13 +23,16 @@ BotControl_ActionCombatDecorElements = {}
 BotControl.ActionButtons = BotControl.ActionButtons or {}
 BotControl.activeBotNameEditBox = nil
 BotControl.activeBotNameSlotIndex = nil
-BotControl.hasChatLinkHook = false
+BotControl.hasChatLinkHook = BotControl.hasChatLinkHook or false
 BotControl.selectedProfileName = nil
 BotControl.selectedProfileNamesByFormat = {}
 BotControl_SelectedProfileName = nil
 BotControl.currentTab = "Profiles"
 BotControl.currentActionsSubTab = "Config"
 BotControl.activeProfileFormat = "party5"
+BotControl.dataInitialized = BotControl.dataInitialized or false
+BotControl.playerInitialized = BotControl.playerInitialized or false
+BotControl.eventsRegistered = BotControl.eventsRegistered or false
 
 BotControl.PROFILES_FRAME_WIDTH = 595
 BotControl.PROFILES_FRAME_HEIGHT = 350
@@ -32,7 +50,8 @@ BotControl.COMMAND_INTERVAL = 0.15
 BotControl.REPEAT_WHISPER_INTERVAL = 0.4
 BotControl.commandQueue = {}
 BotControl.commandQueueInterval = BotControl.COMMAND_INTERVAL
-BotControl.MAX_PROFILE_SLOTS = 25
+-- Le plus grand profil est un raid de 25 : le joueur plus 24 bots.
+BotControl.MAX_PROFILE_SLOTS = 24
 BotControl.PROFILE_SLOT_ROWS = 5
 BotControl.PROFILE_SLOT_TOP_OFFSET = -102
 BotControl.PROFILE_SLOT_ROW_HEIGHT = 40
@@ -55,7 +74,8 @@ BotControl.PROFILE_FORMATS = {
     party5 = {
         key = "party5",
         label = "5 joueurs",
-        slotCount = 5,
+        -- Un groupe de cinq contient le joueur et quatre bots.
+        slotCount = 4,
         columnCount = 1,
         frameHeight = 350,
         groupLayout = {
@@ -65,7 +85,8 @@ BotControl.PROFILE_FORMATS = {
     raid10 = {
         key = "raid10",
         label = "10 joueurs",
-        slotCount = 10,
+        -- Un raid de dix contient le joueur et neuf bots.
+        slotCount = 9,
         columnCount = 1,
         frameHeight = 650,
         groupLayout = {
@@ -76,7 +97,8 @@ BotControl.PROFILE_FORMATS = {
     raid25 = {
         key = "raid25",
         label = "25 joueurs",
-        slotCount = 25,
+        -- Un raid de vingt-cinq contient le joueur et vingt-quatre bots.
+        slotCount = 24,
         columnCount = 3,
         frameHeight = 650,
         sidePanelGap = 50,
@@ -119,12 +141,10 @@ BotControl.FIELD_DEFINITIONS = {
     { key = "healName", label = "Bot 2", column = "left", order = 2 },
     { key = "dps1Name", label = "Bot 3", column = "left", order = 3 },
     { key = "dps2Name", label = "Bot 4", column = "left", order = 4 },
-    { key = "dps3Name", label = "Bot 5", column = "left", order = 5 },
     { key = "tankBuild", roleKey = "tankRole", classKey = "tankClass", label = "", column = "right", order = 1, control = "classSpec" },
     { key = "healBuild", roleKey = "healRole", classKey = "healClass", label = "", column = "right", order = 2, control = "classSpec" },
     { key = "dps1Build", roleKey = "dps1Role", classKey = "dps1Class", label = "", column = "right", order = 3, control = "classSpec" },
-    { key = "dps2Build", roleKey = "dps2Role", classKey = "dps2Class", label = "", column = "right", order = 4, control = "classSpec" },
-    { key = "dps3Build", roleKey = "dps3Role", classKey = "dps3Class", label = "", column = "right", order = 5, control = "classSpec" }
+    { key = "dps2Build", roleKey = "dps2Role", classKey = "dps2Class", label = "", column = "right", order = 4, control = "classSpec" }
 }
 
 BotControl.Roles = {
@@ -597,8 +617,7 @@ function BotControl.BuildLegacySlotsFromDB(db)
         BotControl.CreateProfileSlotEntry(db.tankName, db.tankRole, db.tankClass, db.tankBuild, "tank"),
         BotControl.CreateProfileSlotEntry(db.healName, db.healRole, db.healClass, db.healBuild, "heal"),
         BotControl.CreateProfileSlotEntry(db.dps1Name, db.dps1Role, db.dps1Class, db.dps1Build, "dps"),
-        BotControl.CreateProfileSlotEntry(db.dps2Name, db.dps2Role, db.dps2Class, db.dps2Build, "dps"),
-        BotControl.CreateProfileSlotEntry(db.dps3Name, db.dps3Role, db.dps3Class, db.dps3Build, "dps")
+        BotControl.CreateProfileSlotEntry(db.dps2Name, db.dps2Role, db.dps2Class, db.dps2Build, "dps")
     }
 end
 
@@ -657,6 +676,7 @@ end
 function BotControl.ApplyLegacyStateFromSlots(slots)
     local db = BotControlConfig:GetDB()
     local values = BotControl.BuildLegacyValuesFromSlots(slots)
+    local preserveDps3 = BotControl.GetActiveProfileFormat() == "party5"
 
     if type(db.bots) ~= "table" then
         db.bots = {}
@@ -669,37 +689,40 @@ function BotControl.ApplyLegacyStateFromSlots(slots)
     db.healName = values.healName
     db.dps1Name = values.dps1Name
     db.dps2Name = values.dps2Name
-    db.dps3Name = values.dps3Name
 
     db.tankRole = values.tankRole
     db.healRole = values.healRole
     db.dps1Role = values.dps1Role
     db.dps2Role = values.dps2Role
-    db.dps3Role = values.dps3Role
 
     db.tankClass = values.tankClass
     db.healClass = values.healClass
     db.dps1Class = values.dps1Class
     db.dps2Class = values.dps2Class
-    db.dps3Class = values.dps3Class
 
     db.tankBuild = values.tankBuild
     db.healBuild = values.healBuild
     db.dps1Build = values.dps1Build
     db.dps2Build = values.dps2Build
-    db.dps3Build = values.dps3Build
 
     db.bots.tank = values.tankName
     db.bots.heal = values.healName
     db.bots.dps1 = values.dps1Name
     db.bots.dps2 = values.dps2Name
-    db.bots.dps3 = values.dps3Name
 
     db.builds.tank = values.tankBuild
     db.builds.heal = values.healBuild
     db.builds.dps1 = values.dps1Build
     db.builds.dps2 = values.dps2Build
-    db.builds.dps3 = values.dps3Build
+
+    if not preserveDps3 then
+        db.dps3Name = values.dps3Name
+        db.dps3Role = values.dps3Role
+        db.dps3Class = values.dps3Class
+        db.dps3Build = values.dps3Build
+        db.bots.dps3 = values.dps3Name
+        db.builds.dps3 = values.dps3Build
+    end
 end
 
 function BotControl.EnsureProfileStorage()
@@ -754,7 +777,10 @@ function BotControl.EnsureProfileStorage()
     end
 
     if not BotControl.HasAnySlotData(db.currentSlotsByFormat.party5.slots) then
-        db.currentSlotsByFormat.party5.slots = BotControl.NormalizeSlotsList(BotControl.BuildLegacySlotsFromDB(db), 5)
+        db.currentSlotsByFormat.party5.slots = BotControl.NormalizeSlotsList(
+            BotControl.BuildLegacySlotsFromDB(db),
+            BotControl.GetProfileSlotCount("party5")
+        )
     end
 
     db.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
@@ -799,7 +825,7 @@ function BotControl.GetActiveProfileSlots()
     return BotControl.GetWorkingSlots(BotControl.GetActiveProfileFormat())
 end
 
-function BotControl.BuildProfileFromSlots(formatKey, slots)
+function BotControl.BuildProfileFromSlots(formatKey, slots, previousProfile)
     local normalizedSlots = BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
     local profile = {
         slots = normalizedSlots
@@ -812,16 +838,22 @@ function BotControl.BuildProfileFromSlots(formatKey, slots)
             tank = legacyValues.tankName,
             heal = legacyValues.healName,
             dps1 = legacyValues.dps1Name,
-            dps2 = legacyValues.dps2Name,
-            dps3 = legacyValues.dps3Name
+            dps2 = legacyValues.dps2Name
         }
         profile.builds = {
             tank = BotControl.CreateProfileBuildEntry(legacyValues.tankClass, legacyValues.tankBuild),
             heal = BotControl.CreateProfileBuildEntry(legacyValues.healClass, legacyValues.healBuild),
             dps1 = BotControl.CreateProfileBuildEntry(legacyValues.dps1Class, legacyValues.dps1Build),
-            dps2 = BotControl.CreateProfileBuildEntry(legacyValues.dps2Class, legacyValues.dps2Build),
-            dps3 = BotControl.CreateProfileBuildEntry(legacyValues.dps3Class, legacyValues.dps3Build)
+            dps2 = BotControl.CreateProfileBuildEntry(legacyValues.dps2Class, legacyValues.dps2Build)
         }
+
+        -- Garde l'ancien cinquieme bot en sauvegarde, sans l'afficher ni l'utiliser.
+        if type(previousProfile) == "table" and type(previousProfile.bots) == "table" then
+            profile.bots.dps3 = previousProfile.bots.dps3
+        end
+        if type(previousProfile) == "table" and type(previousProfile.builds) == "table" then
+            profile.builds.dps3 = previousProfile.builds.dps3
+        end
     end
 
     return profile
@@ -855,7 +887,7 @@ function BotControl.BuildSlotsFromProfile(profile, formatKey)
         profile.builds = {}
     end
 
-    for index = 1, 5 do
+    for index = 1, BotControl.GetProfileSlotCount(formatKey) do
         if index == 1 then
             name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.tank, "tank", profile.builds.tank)
         elseif index == 2 then
@@ -864,26 +896,54 @@ function BotControl.BuildSlotsFromProfile(profile, formatKey)
             name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.dps1, "dps", profile.builds.dps1)
         elseif index == 4 then
             name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.dps2, "dps", profile.builds.dps2)
-        else
-            name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.dps3, "dps", profile.builds.dps3)
         end
 
         slots[index] = BotControl.CreateProfileSlotEntry(name, roleName, className, specName, BotControl.GetDefaultRoleForSlotIndex(index))
     end
 
-    return BotControl.NormalizeSlotsList(slots, 5)
+    return BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
+end
+
+function BotControl.SetDropdownWidth(dropdown, width)
+    local applied = false
+
+    if type(UIDropDownMenu_SetWidth) == "function" then
+        applied = pcall(UIDropDownMenu_SetWidth, width, dropdown)
+    end
+
+    if not applied and dropdown and dropdown.SetWidth then
+        dropdown:SetWidth(width)
+    end
+end
+
+function BotControl.JustifyDropdownText(dropdown, justification)
+    if type(UIDropDownMenu_JustifyText) == "function" then
+        pcall(UIDropDownMenu_JustifyText, justification, dropdown)
+    end
 end
 
 function BotControl.UpdateDropdownValue(dropdown, value, emptyText)
+    local applied = false
+    local textRegion
+
     value = BotControl.Trim(value or "")
     dropdown.selectedValue = value
 
-    if BotControl.HasValue(value) then
-        UIDropDownMenu_SetSelectedValue(dropdown, value)
-        UIDropDownMenu_SetText(value, dropdown)
-    else
-        UIDropDownMenu_SetText(emptyText or "", dropdown)
+    if type(UIDropDownMenu_SetText) == "function" then
+        if BotControl.HasValue(value) then
+            applied = pcall(UIDropDownMenu_SetText, value, dropdown)
+        else
+            applied = pcall(UIDropDownMenu_SetText, emptyText or "", dropdown)
+        end
     end
+
+    if not applied and dropdown and dropdown.GetName then
+        textRegion = BotControl.Compat.GetGlobal(dropdown:GetName() .. "Text")
+        if textRegion and textRegion.SetText then
+            textRegion:SetText(BotControl.HasValue(value) and value or (emptyText or ""))
+        end
+    end
+
 end
 
 function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onSelect)
@@ -893,11 +953,12 @@ function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onS
     dropdown.emptyText = emptyText or ""
     dropdown.onSelect = onSelect
 
-    UIDropDownMenu_Initialize(dropdown, function(level)
+    dropdown.initialize = function()
         local index
         local optionValue
         local optionText
         local info
+        local level = UIDROPDOWNMENU_MENU_LEVEL or 1
 
         if level and level ~= 1 then
             return
@@ -909,7 +970,7 @@ function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onS
             if optionText == "" then
                 optionText = "-"
             end
-            info = UIDropDownMenu_CreateInfo()
+            info = {}
             info.text = optionText
             info.value = optionValue
             do
@@ -924,7 +985,7 @@ function BotControl.SetupDropdown(dropdown, items, selectedValue, emptyText, onS
             end
             UIDropDownMenu_AddButton(info, 1)
         end
-    end)
+    end
 
     BotControl.UpdateDropdownValue(dropdown, selectedValue, emptyText)
 end
@@ -1007,7 +1068,7 @@ function BotControl.FocusNextBotNameField(currentSlotIndex)
 
     for slotIndex = (currentSlotIndex or 0) + 1, slotCount do
         slotField = frame.profileSlotFields[slotIndex]
-        if slotField and slotField.editBox and slotField.editBox:IsVisible() then
+        if slotField and slotField.editBox and slotField.editBox:IsShown() then
             BotControl.SetActiveBotNameField(slotField.editBox)
             slotField.editBox:SetFocus()
             if slotField.editBox.HighlightText then
@@ -1045,7 +1106,7 @@ function BotControl.InsertBotNameFromChat(name)
         return false
     end
 
-    if not editBox:IsVisible() then
+    if not editBox:IsShown() then
         return false
     end
 
@@ -1063,50 +1124,35 @@ function BotControl.InsertBotNameFromChat(name)
     return true
 end
 
+function BotControl.HandleChatLinkClick(link, text, button)
+    local name
+
+    if type(IsShiftKeyDown) ~= "function" or not IsShiftKeyDown() or button ~= "LeftButton" then
+        return false
+    end
+
+    name = BotControl.ExtractPlayerNameFromChatLink(link, text)
+    if name then
+        return BotControl.InsertBotNameFromChat(name)
+    end
+
+    return false
+end
+
 function BotControl.SetupChatLinkHook()
-    if BotControl.hasChatLinkHook then
+    if BotControl.hasChatLinkHook or type(SetItemRef) ~= "function" then
         return
     end
 
-    if type(hooksecurefunc) == "function" then
-        hooksecurefunc("SetItemRef", function(link, text, button)
-            local name
-
-            if type(IsShiftKeyDown) ~= "function" or not IsShiftKeyDown() then
-                return
-            end
-
-            if button ~= "LeftButton" then
-                return
-            end
-
-            name = BotControl.ExtractPlayerNameFromChatLink(link, text)
-            if name then
-                BotControl.InsertBotNameFromChat(name)
-            end
-        end)
-
-        BotControl.hasChatLinkHook = true
-        return
-    end
-
-    if type(SetItemRef) == "function" then
-        BotControl.originalSetItemRef = BotControl.originalSetItemRef or SetItemRef
-        SetItemRef = function(link, text, button)
-            local name
-
-            if type(IsShiftKeyDown) == "function" and IsShiftKeyDown() and button == "LeftButton" then
-                name = BotControl.ExtractPlayerNameFromChatLink(link, text)
-                if name and BotControl.InsertBotNameFromChat(name) then
-                    return
-                end
-            end
-
-            return BotControl.originalSetItemRef(link, text, button)
+    BotControl.originalSetItemRef = SetItemRef
+    SetItemRef = function(link, text, button)
+        if BotControl.HandleChatLinkClick(link, text, button) then
+            return
         end
 
-        BotControl.hasChatLinkHook = true
+        return BotControl.originalSetItemRef(link, text, button)
     end
+    BotControl.hasChatLinkHook = true
 end
 
 function BotControl.Toggle()
@@ -1140,6 +1186,37 @@ function BotControl.RegisterSpecialFrame(frameName)
     end
 
     table.insert(UISpecialFrames, frameName)
+end
+
+function BotControl.OnEditBoxClearFocus()
+    if this and this.ClearFocus then
+        this:ClearFocus()
+    end
+end
+
+function BotControl.OnBotNameEditFocusGained()
+    BotControl.SetActiveBotNameField(this)
+end
+
+function BotControl.OnBotNameEditFocusLost()
+    if this and this.isBotControlBotNameField then
+        BotControl.activeBotNameEditBox = this
+        BotControl.activeBotNameSlotIndex = this.slotIndex
+    end
+end
+
+function BotControl.OnMainFrameMouseDown()
+    local mouseButton = arg1 or button
+
+    if this and (not mouseButton or mouseButton == "LeftButton") then
+        this:StartMoving()
+    end
+end
+
+function BotControl.OnMainFrameMouseUp()
+    if this then
+        this:StopMovingOrSizing()
+    end
 end
 
 function BotControl.CreateTextField(parent, definition)
@@ -1192,12 +1269,8 @@ function BotControl.CreateTextField(parent, definition)
     editBox:SetBackdropColor(0, 0, 0, 0.8)
     editBox:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
 
-    editBox:SetScript("OnEscapePressed", function(self)
-        self:ClearFocus()
-    end)
-    editBox:SetScript("OnEnterPressed", function(self)
-        self:ClearFocus()
-    end)
+    editBox:SetScript("OnEscapePressed", BotControl.OnEditBoxClearFocus)
+    editBox:SetScript("OnEnterPressed", BotControl.OnEditBoxClearFocus)
 
     return {
         key = definition.key,
@@ -1233,20 +1306,20 @@ function BotControl.CreateClassSpecField(parent, definition)
     roleDropdown = CreateFrame("Frame", "BotControl" .. dropdownName .. "RoleDropDown", parent, "UIDropDownMenuTemplate")
     roleDropdown:ClearAllPoints()
     roleDropdown:SetPoint("TOPLEFT", parent, "TOPLEFT", roleDropdownX, rowY - 8)
-    UIDropDownMenu_SetWidth(roleDropdownWidth, roleDropdown)
-    UIDropDownMenu_JustifyText("LEFT", roleDropdown)
+    BotControl.SetDropdownWidth(roleDropdown, roleDropdownWidth)
+    BotControl.JustifyDropdownText(roleDropdown, "LEFT")
 
     classDropdown = CreateFrame("Frame", "BotControl" .. dropdownName .. "ClassDropDown", parent, "UIDropDownMenuTemplate")
     classDropdown:ClearAllPoints()
     classDropdown:SetPoint("LEFT", roleDropdown, "RIGHT", firstDropdownSpacing, 0)
-    UIDropDownMenu_SetWidth(classDropdownWidth, classDropdown)
-    UIDropDownMenu_JustifyText("LEFT", classDropdown)
+    BotControl.SetDropdownWidth(classDropdown, classDropdownWidth)
+    BotControl.JustifyDropdownText(classDropdown, "LEFT")
 
     specDropdown = CreateFrame("Frame", "BotControl" .. dropdownName .. "SpecDropDown", parent, "UIDropDownMenuTemplate")
     specDropdown:ClearAllPoints()
     specDropdown:SetPoint("LEFT", classDropdown, "RIGHT", dropdownSpacing, 0)
-    UIDropDownMenu_SetWidth(specDropdownWidth, specDropdown)
-    UIDropDownMenu_JustifyText("LEFT", specDropdown)
+    BotControl.SetDropdownWidth(specDropdown, specDropdownWidth)
+    BotControl.JustifyDropdownText(specDropdown, "LEFT")
 
     field = {
         key = definition.key,
@@ -1360,15 +1433,8 @@ function BotControl.CreateProfileSlotField(parent, slotIndex)
 
     nameField.editBox.isBotControlBotNameField = true
     nameField.editBox.slotIndex = slotIndex
-    nameField.editBox:SetScript("OnEditFocusGained", function(self)
-        BotControl.SetActiveBotNameField(self)
-    end)
-    nameField.editBox:SetScript("OnEditFocusLost", function(self)
-        if self and self.isBotControlBotNameField then
-            BotControl.activeBotNameEditBox = self
-            BotControl.activeBotNameSlotIndex = self.slotIndex
-        end
-    end)
+    nameField.editBox:SetScript("OnEditFocusGained", BotControl.OnBotNameEditFocusGained)
+    nameField.editBox:SetScript("OnEditFocusLost", BotControl.OnBotNameEditFocusLost)
 
     specField = BotControl.CreateClassSpecField(parent, {
         key = specKey,
@@ -1469,15 +1535,15 @@ function BotControl.LayoutProfileFields(frame)
 
                 slotField.roleDropdown:ClearAllPoints()
                 slotField.roleDropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", columnX + BotControl.PROFILE_SLOT_ROLE_DROPDOWN_X, rowY - 8)
-                UIDropDownMenu_SetWidth(BotControl.PROFILE_SLOT_ROLE_WIDTH, slotField.roleDropdown)
+                BotControl.SetDropdownWidth(slotField.roleDropdown, BotControl.PROFILE_SLOT_ROLE_WIDTH)
 
                 slotField.classDropdown:ClearAllPoints()
                 slotField.classDropdown:SetPoint("LEFT", slotField.roleDropdown, "RIGHT", BotControl.PROFILE_SLOT_DROPDOWN_SPACING, 0)
-                UIDropDownMenu_SetWidth(BotControl.PROFILE_SLOT_CLASS_WIDTH, slotField.classDropdown)
+                BotControl.SetDropdownWidth(slotField.classDropdown, BotControl.PROFILE_SLOT_CLASS_WIDTH)
 
                 slotField.specDropdown:ClearAllPoints()
                 slotField.specDropdown:SetPoint("LEFT", slotField.classDropdown, "RIGHT", BotControl.PROFILE_SLOT_DROPDOWN_SPACING, 0)
-                UIDropDownMenu_SetWidth(BotControl.PROFILE_SLOT_SPEC_WIDTH, slotField.specDropdown)
+                BotControl.SetDropdownWidth(slotField.specDropdown, BotControl.PROFILE_SLOT_SPEC_WIDTH)
 
                 slotField:SetVisible(true)
             else
@@ -1781,37 +1847,37 @@ function BotControl.CleanupButtonTemplate(button)
 
     buttonName = button:GetName()
     if buttonName then
-        region = getglobal(buttonName .. "Left")
+        region = BotControl.Compat.GetGlobal(buttonName .. "Left")
         if region then
             region:SetTexture(nil)
             region:Hide()
         end
 
-        region = getglobal(buttonName .. "Middle")
+        region = BotControl.Compat.GetGlobal(buttonName .. "Middle")
         if region then
             region:SetTexture(nil)
             region:Hide()
         end
 
-        region = getglobal(buttonName .. "Right")
+        region = BotControl.Compat.GetGlobal(buttonName .. "Right")
         if region then
             region:SetTexture(nil)
             region:Hide()
         end
 
-        region = getglobal(buttonName .. "LeftDisabled")
+        region = BotControl.Compat.GetGlobal(buttonName .. "LeftDisabled")
         if region then
             region:SetTexture(nil)
             region:Hide()
         end
 
-        region = getglobal(buttonName .. "MiddleDisabled")
+        region = BotControl.Compat.GetGlobal(buttonName .. "MiddleDisabled")
         if region then
             region:SetTexture(nil)
             region:Hide()
         end
 
-        region = getglobal(buttonName .. "RightDisabled")
+        region = BotControl.Compat.GetGlobal(buttonName .. "RightDisabled")
         if region then
             region:SetTexture(nil)
             region:Hide()
@@ -1827,6 +1893,57 @@ function BotControl.CleanupButtonTemplate(button)
                 region:Hide()
             end
         end
+    end
+end
+
+function BotControl.OnActionButtonEnter()
+    local button = this
+
+    if not button then
+        return
+    end
+
+    if button.iconTexture then
+        button.iconTexture:SetVertexColor(1, 1, 1)
+    end
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+    GameTooltip:SetText(button.tooltipTitle or "")
+    if BotControl.HasValue(button.tooltipDescription) then
+        GameTooltip:AddLine(button.tooltipDescription, 1, 1, 1, 1)
+    end
+    if BotControl.HasValue(button.tooltipSlashCommand) then
+        GameTooltip:AddLine("Commande : " .. button.tooltipSlashCommand, 0.6, 0.85, 1, 1)
+    end
+    GameTooltip:Show()
+end
+
+function BotControl.OnActionButtonLeave()
+    local button = this
+
+    if button and button.iconTexture then
+        button.iconTexture:SetVertexColor(1, 1, 1)
+    end
+    GameTooltip:Hide()
+end
+
+function BotControl.OnActionButtonMouseDown()
+    local button = this
+
+    if button and button.iconTexture then
+        button.iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", 3, -3)
+        button.iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+        button.iconTexture:SetVertexColor(0.8, 0.8, 0.8)
+    end
+end
+
+function BotControl.OnActionButtonMouseUp()
+    local button = this
+
+    if button and button.iconTexture then
+        button.iconTexture:ClearAllPoints()
+        button.iconTexture:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+        button.iconTexture:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -2, 2)
+        button.iconTexture:SetVertexColor(1, 1, 1)
     end
 end
 
@@ -1857,44 +1974,10 @@ function BotControl_SetActionButtonIcon(button, texturePath, title, description,
     button.tooltipDescription = description or ""
     button.tooltipSlashCommand = slashCommand or ""
 
-    button:SetScript("OnEnter", function(self)
-        if self.iconTexture then
-            self.iconTexture:SetVertexColor(1, 1, 1)
-        end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(self.tooltipTitle or "")
-        if BotControl.HasValue(self.tooltipDescription) then
-            GameTooltip:AddLine(self.tooltipDescription, 1, 1, 1, 1)
-        end
-        if BotControl.HasValue(self.tooltipSlashCommand) then
-            GameTooltip:AddLine("Commande : " .. self.tooltipSlashCommand, 0.6, 0.85, 1, 1)
-        end
-        GameTooltip:Show()
-    end)
-
-    button:SetScript("OnLeave", function()
-        if button.iconTexture then
-            button.iconTexture:SetVertexColor(1, 1, 1)
-        end
-        GameTooltip:Hide()
-    end)
-
-    button:SetScript("OnMouseDown", function(self)
-        if self.iconTexture then
-            self.iconTexture:SetPoint("TOPLEFT", self, "TOPLEFT", 3, -3)
-            self.iconTexture:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -1, 1)
-            self.iconTexture:SetVertexColor(0.8, 0.8, 0.8)
-        end
-    end)
-
-    button:SetScript("OnMouseUp", function(self)
-        if self.iconTexture then
-            self.iconTexture:ClearAllPoints()
-            self.iconTexture:SetPoint("TOPLEFT", self, "TOPLEFT", 2, -2)
-            self.iconTexture:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -2, 2)
-            self.iconTexture:SetVertexColor(1, 1, 1)
-        end
-    end)
+    button:SetScript("OnEnter", BotControl.OnActionButtonEnter)
+    button:SetScript("OnLeave", BotControl.OnActionButtonLeave)
+    button:SetScript("OnMouseDown", BotControl.OnActionButtonMouseDown)
+    button:SetScript("OnMouseUp", BotControl.OnActionButtonMouseUp)
 end
 
 function BotControl.GetCanonicalActionSlashAlias(actionName)
@@ -2201,6 +2284,46 @@ function BotControl.InitializeFrame(frame)
     frame.isInitialized = true
 end
 
+function BotControl.OnActionButtonClick()
+    local actionKey = this and this.botControlActionKey
+
+    if actionKey then
+        BotControl_RunNamedAction(actionKey)
+    end
+end
+
+function BotControl.OnControlButtonClick()
+    local controlAction = this and this.botControlControlAction
+
+    if controlAction == "ShowProfiles" then
+        BotControl_ShowTab("Profiles")
+    elseif controlAction == "ShowActions" then
+        BotControl_ShowTab("Actions")
+    elseif controlAction == "ShowConfigActions" then
+        BotControl_ShowActionsSubTab("Config")
+    elseif controlAction == "ShowCombatActions" then
+        BotControl_ShowActionsSubTab("Combat")
+    elseif controlAction == "ShowParty5" then
+        BotControl_ShowProfilesSubTab("party5")
+    elseif controlAction == "ShowRaid10" then
+        BotControl_ShowProfilesSubTab("raid10")
+    elseif controlAction == "ShowRaid25" then
+        BotControl_ShowProfilesSubTab("raid25")
+    elseif controlAction == "SaveProfile" then
+        BotControl_SaveProfile(BotControl.GetProfileName())
+    elseif controlAction == "LoadProfile" then
+        BotControl_LoadProfile(BotControl.GetSelectedProfileName())
+    elseif controlAction == "DeleteProfile" then
+        BotControl_DeleteProfile(BotControl.GetSelectedProfileName())
+    end
+end
+
+function BotControl.OnProfileListButtonClick()
+    if this then
+        BotControl.SelectProfile(this.profileName)
+    end
+end
+
 function BotControl.CreateActionButtons(frame)
     local orderedActions = BotControl.GetOrderedRegistryActions and BotControl.GetOrderedRegistryActions() or {}
     local index
@@ -2218,7 +2341,7 @@ function BotControl.CreateActionButtons(frame)
         action = orderedActions[index]
         buttonName = BotControl.GetActionButtonName(action)
         local actionKey = action.key
-        button = _G[buttonName]
+        button = BotControl.Compat.GetGlobal(buttonName)
 
         if not button then
             button = CreateFrame("Button", buttonName, frame, "UIPanelButtonTemplate")
@@ -2227,12 +2350,11 @@ function BotControl.CreateActionButtons(frame)
         button:SetText(action.label or action.key)
         button:SetWidth(110)
         button:SetHeight(24)
-        button:SetScript("OnClick", function()
-            BotControl_RunNamedAction(actionKey)
-        end)
+        button.botControlActionKey = actionKey
+        button:SetScript("OnClick", BotControl.OnActionButtonClick)
 
         BotControl.ActionButtons[actionKey] = button
-        _G[buttonName] = button
+        BotControl.Compat.GlobalEnv[buttonName] = button
     end
 end
 
@@ -2268,9 +2390,8 @@ function BotControl.CreateButtons(frame)
         profilesTabButton:SetText("Profiles")
         profilesTabButton:SetWidth(90)
         profilesTabButton:SetHeight(22)
-        profilesTabButton:SetScript("OnClick", function()
-            BotControl_ShowTab("Profiles")
-        end)
+        profilesTabButton.botControlControlAction = "ShowProfiles"
+        profilesTabButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlTabActions then
@@ -2278,9 +2399,8 @@ function BotControl.CreateButtons(frame)
         actionsTabButton:SetText("Actions")
         actionsTabButton:SetWidth(90)
         actionsTabButton:SetHeight(22)
-        actionsTabButton:SetScript("OnClick", function()
-            BotControl_ShowTab("Actions")
-        end)
+        actionsTabButton.botControlControlAction = "ShowActions"
+        actionsTabButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlActionsSubTabConfig then
@@ -2288,9 +2408,8 @@ function BotControl.CreateButtons(frame)
         configSubTabButton:SetText("Config")
         configSubTabButton:SetWidth(78)
         configSubTabButton:SetHeight(20)
-        configSubTabButton:SetScript("OnClick", function()
-            BotControl_ShowActionsSubTab("Config")
-        end)
+        configSubTabButton.botControlControlAction = "ShowConfigActions"
+        configSubTabButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlActionsSubTabCombat then
@@ -2298,9 +2417,8 @@ function BotControl.CreateButtons(frame)
         combatSubTabButton:SetText("Combat")
         combatSubTabButton:SetWidth(78)
         combatSubTabButton:SetHeight(20)
-        combatSubTabButton:SetScript("OnClick", function()
-            BotControl_ShowActionsSubTab("Combat")
-        end)
+        combatSubTabButton.botControlControlAction = "ShowCombatActions"
+        combatSubTabButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlCombatTankHeader then
@@ -2329,19 +2447,22 @@ function BotControl.CreateButtons(frame)
 
     if not BotControlCombatSeparator1 then
         combatSeparator1 = frame:CreateTexture("BotControlCombatSeparator1", "ARTWORK")
-        combatSeparator1:SetTexture(1, 1, 1, 0.18)
+        combatSeparator1:SetTexture("Interface\\Buttons\\WHITE8X8")
+        combatSeparator1:SetVertexColor(1, 1, 1, 0.18)
         combatSeparator1:SetWidth(1)
     end
 
     if not BotControlCombatSeparator2 then
         combatSeparator2 = frame:CreateTexture("BotControlCombatSeparator2", "ARTWORK")
-        combatSeparator2:SetTexture(1, 1, 1, 0.18)
+        combatSeparator2:SetTexture("Interface\\Buttons\\WHITE8X8")
+        combatSeparator2:SetVertexColor(1, 1, 1, 0.18)
         combatSeparator2:SetWidth(1)
     end
 
     if not BotControlCombatSeparator3 then
         combatSeparator3 = frame:CreateTexture("BotControlCombatSeparator3", "ARTWORK")
-        combatSeparator3:SetTexture(1, 1, 1, 0.18)
+        combatSeparator3:SetTexture("Interface\\Buttons\\WHITE8X8")
+        combatSeparator3:SetVertexColor(1, 1, 1, 0.18)
         combatSeparator3:SetWidth(1)
     end
 
@@ -2350,9 +2471,8 @@ function BotControl.CreateButtons(frame)
         profileSubTab5Button:SetText("5 joueurs")
         profileSubTab5Button:SetWidth(82)
         profileSubTab5Button:SetHeight(20)
-        profileSubTab5Button:SetScript("OnClick", function()
-            BotControl_ShowProfilesSubTab("party5")
-        end)
+        profileSubTab5Button.botControlControlAction = "ShowParty5"
+        profileSubTab5Button:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlProfilesSubTab10 then
@@ -2360,9 +2480,8 @@ function BotControl.CreateButtons(frame)
         profileSubTab10Button:SetText("10 joueurs")
         profileSubTab10Button:SetWidth(86)
         profileSubTab10Button:SetHeight(20)
-        profileSubTab10Button:SetScript("OnClick", function()
-            BotControl_ShowProfilesSubTab("raid10")
-        end)
+        profileSubTab10Button.botControlControlAction = "ShowRaid10"
+        profileSubTab10Button:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlProfilesSubTab25 then
@@ -2370,9 +2489,8 @@ function BotControl.CreateButtons(frame)
         profileSubTab25Button:SetText("25 joueurs")
         profileSubTab25Button:SetWidth(86)
         profileSubTab25Button:SetHeight(20)
-        profileSubTab25Button:SetScript("OnClick", function()
-            BotControl_ShowProfilesSubTab("raid25")
-        end)
+        profileSubTab25Button.botControlControlAction = "ShowRaid25"
+        profileSubTab25Button:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     BotControl.CreateActionButtons(frame)
@@ -2382,9 +2500,8 @@ function BotControl.CreateButtons(frame)
         saveProfileButton:SetText("Save profile")
         saveProfileButton:SetWidth(110)
         saveProfileButton:SetHeight(24)
-        saveProfileButton:SetScript("OnClick", function()
-            BotControl_SaveProfile(BotControl.GetProfileName())
-        end)
+        saveProfileButton.botControlControlAction = "SaveProfile"
+        saveProfileButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlLoadProfileButton then
@@ -2392,9 +2509,8 @@ function BotControl.CreateButtons(frame)
         loadProfileButton:SetText("Load profile")
         loadProfileButton:SetWidth(110)
         loadProfileButton:SetHeight(24)
-        loadProfileButton:SetScript("OnClick", function()
-            BotControl_LoadProfile(BotControl.GetSelectedProfileName())
-        end)
+        loadProfileButton.botControlControlAction = "LoadProfile"
+        loadProfileButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlDeleteProfileButton then
@@ -2402,9 +2518,8 @@ function BotControl.CreateButtons(frame)
         deleteProfileButton:SetText("Delete profile")
         deleteProfileButton:SetWidth(110)
         deleteProfileButton:SetHeight(24)
-        deleteProfileButton:SetScript("OnClick", function()
-            BotControl_DeleteProfile(BotControl.GetSelectedProfileName())
-        end)
+        deleteProfileButton.botControlControlAction = "DeleteProfile"
+        deleteProfileButton:SetScript("OnClick", BotControl.OnControlButtonClick)
     end
 
     if not BotControlProfilesListLabel then
@@ -2429,11 +2544,13 @@ function BotControl.CreateButtons(frame)
         profileListFrame:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
     end
 
+    profileListFrame = BotControl.Compat.BindGlobal("BotControlProfilesListFrame", profileListFrame)
+
     if not BotControl.profileListButtons then
         BotControl.profileListButtons = {}
 
         for index = 1, 8 do
-            profileListButton = CreateFrame("Button", nil, BotControlProfilesListFrame)
+            profileListButton = CreateFrame("Button", nil, profileListFrame)
             profileListButton:SetWidth(122)
             profileListButton:SetHeight(16)
             profileListButton.text = profileListButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -2441,12 +2558,10 @@ function BotControl.CreateButtons(frame)
             profileListButton.text:SetPoint("RIGHT", profileListButton, "RIGHT", -2, 0)
             profileListButton.text:SetJustifyH("LEFT")
             profileListButton.text:SetText("")
-            profileListButton:SetScript("OnClick", function(self)
-                BotControl.SelectProfile(self.profileName)
-            end)
+            profileListButton:SetScript("OnClick", BotControl.OnProfileListButtonClick)
 
             if index == 1 then
-                profileListButton:SetPoint("TOPLEFT", BotControlProfilesListFrame, "TOPLEFT", 8, -8)
+                profileListButton:SetPoint("TOPLEFT", profileListFrame, "TOPLEFT", 8, -8)
             else
                 profileListButton:SetPoint("TOPLEFT", BotControl.profileListButtons[index - 1], "BOTTOMLEFT", 0, -4)
             end
@@ -2454,6 +2569,25 @@ function BotControl.CreateButtons(frame)
             BotControl.profileListButtons[index] = profileListButton
         end
     end
+
+    BotControl.Compat.BindGlobal("BotControlTabProfiles", profilesTabButton)
+    BotControl.Compat.BindGlobal("BotControlTabActions", actionsTabButton)
+    BotControl.Compat.BindGlobal("BotControlActionsSubTabConfig", configSubTabButton)
+    BotControl.Compat.BindGlobal("BotControlActionsSubTabCombat", combatSubTabButton)
+    BotControl.Compat.BindGlobal("BotControlCombatTankHeader", combatTankHeader)
+    BotControl.Compat.BindGlobal("BotControlCombatDPSHeader", combatDpsHeader)
+    BotControl.Compat.BindGlobal("BotControlCombatHealHeader", combatHealHeader)
+    BotControl.Compat.BindGlobal("BotControlCombatAllHeader", combatAllHeader)
+    BotControl.Compat.BindGlobal("BotControlCombatSeparator1", combatSeparator1)
+    BotControl.Compat.BindGlobal("BotControlCombatSeparator2", combatSeparator2)
+    BotControl.Compat.BindGlobal("BotControlCombatSeparator3", combatSeparator3)
+    BotControl.Compat.BindGlobal("BotControlProfilesSubTab5", profileSubTab5Button)
+    BotControl.Compat.BindGlobal("BotControlProfilesSubTab10", profileSubTab10Button)
+    BotControl.Compat.BindGlobal("BotControlProfilesSubTab25", profileSubTab25Button)
+    BotControl.Compat.BindGlobal("BotControlSaveProfileButton", saveProfileButton)
+    BotControl.Compat.BindGlobal("BotControlLoadProfileButton", loadProfileButton)
+    BotControl.Compat.BindGlobal("BotControlDeleteProfileButton", deleteProfileButton)
+    BotControl.Compat.BindGlobal("BotControlProfilesListLabel", profileListLabel)
 end
 
 function BotControl.GetProfileName()
@@ -2548,7 +2682,7 @@ function BotControl_SaveProfile(profileName)
     end
 
     profiles = BotControl.GetProfilesTable(formatKey)
-    profiles[profileName] = BotControl.BuildProfileFromSlots(formatKey, slots)
+    profiles[profileName] = BotControl.BuildProfileFromSlots(formatKey, slots, profiles[profileName])
     BotControl.selectedProfileNamesByFormat[formatKey] = profileName
     BotControl.selectedProfileName = profileName
     BotControl_SelectedProfileName = profileName
@@ -2941,6 +3075,10 @@ function BotControl.SendChatCommand(commandType, message, target)
         return
     end
 
+    if type(SendChatMessage) ~= "function" then
+        return
+    end
+
     if commandType == "WHISPER" and BotControl.HasValue(target) then
         SendChatMessage(message, "WHISPER", nil, target)
     elseif commandType == "PARTY" then
@@ -2949,40 +3087,34 @@ function BotControl.SendChatCommand(commandType, message, target)
 end
 
 function BotControl.ExecuteSlashCommand(command)
-    local editBox
+    local chatFrame = DEFAULT_CHAT_FRAME
     local targetEditBox
 
-    if not BotControl.HasValue(command) then
-        return
+    if not BotControl.HasValue(command) or not chatFrame then
+        return false
     end
 
-    editBox = ChatFrameEditBox or DEFAULT_CHAT_FRAME.editBox
-    if not editBox then
-        return
+    targetEditBox = ChatFrameEditBox or chatFrame.editBox
+    if not targetEditBox or type(ChatFrame_OpenChat) ~= "function" or type(ChatEdit_SendText) ~= "function" then
+        return false
     end
 
-    ChatFrame_OpenChat(command, DEFAULT_CHAT_FRAME)
-    if ChatFrameEditBox and ChatFrameEditBox:GetText() == command then
-        targetEditBox = ChatFrameEditBox
-        ChatEdit_SendText(targetEditBox, 0)
-    elseif DEFAULT_CHAT_FRAME.editBox and DEFAULT_CHAT_FRAME.editBox:GetText() == command then
-        targetEditBox = DEFAULT_CHAT_FRAME.editBox
-        ChatEdit_SendText(targetEditBox, 0)
+    ChatFrame_OpenChat(command, chatFrame)
+    targetEditBox = ChatFrameEditBox or chatFrame.editBox or targetEditBox
+    if targetEditBox:GetText() ~= command then
+        targetEditBox:SetText(command)
+    end
+    ChatEdit_SendText(targetEditBox, 0)
+
+    targetEditBox:SetText("")
+    if type(ChatEdit_DeactivateChat) == "function" then
+        ChatEdit_DeactivateChat(targetEditBox)
     else
-        editBox:SetText(command)
-        targetEditBox = editBox
-        ChatEdit_SendText(targetEditBox, 0)
+        targetEditBox:ClearFocus()
+        targetEditBox:Hide()
     end
 
-    if targetEditBox then
-        targetEditBox:SetText("")
-        if ChatEdit_DeactivateChat then
-            ChatEdit_DeactivateChat(targetEditBox)
-        else
-            targetEditBox:ClearFocus()
-            targetEditBox:Hide()
-        end
-    end
+    return true
 end
 
 function BotControl.ExecuteCommandNow(command)
@@ -3046,10 +3178,15 @@ function BotControl.ProcessCommandQueue()
 end
 
 commandQueueFrame.elapsed = 0
-commandQueueFrame:SetScript("OnUpdate", function()
+function BotControl.OnCommandQueueUpdate()
     local interval = BotControl.commandQueueInterval or BotControl.COMMAND_INTERVAL
 
-    commandQueueFrame.elapsed = commandQueueFrame.elapsed + arg1
+    if not BotControl.commandQueue or table.getn(BotControl.commandQueue) == 0 then
+        commandQueueFrame:Hide()
+        return
+    end
+
+    commandQueueFrame.elapsed = commandQueueFrame.elapsed + (arg1 or 0)
 
     if commandQueueFrame.elapsed < interval then
         return
@@ -3057,7 +3194,8 @@ commandQueueFrame:SetScript("OnUpdate", function()
 
     commandQueueFrame.elapsed = 0
     BotControl.ProcessCommandQueue()
-end)
+end
+commandQueueFrame:SetScript("OnUpdate", BotControl.OnCommandQueueUpdate)
 
 function BotControl.RunCommand(command)
     BotControl.ExecuteCommandNow(command)
@@ -3078,12 +3216,19 @@ end
 
 function BotControl.RunCommands(commands)
     local index
+    local commandCount
 
     if type(commands) ~= "table" then
         return
     end
 
-    for index = 1, table.getn(commands) do
+    commandCount = table.getn(commands)
+    if commandCount > 1 then
+        BotControl.RunCommandsQueued(commands)
+        return
+    end
+
+    for index = 1, commandCount do
         BotControl.RunCommand(commands[index])
     end
 end
@@ -3223,21 +3368,10 @@ function BotControl.SetupSlashCommands()
 end
 
 function BotControl.HandleEvent()
-    local db
-
     if event == "ADDON_LOADED" and arg1 == "BotControl" then
-        BotControlConfig:Initialize()
-        BotControl.EnsureProfileStorage()
-        BotControl.SetupSlashCommands()
-        BotControl.SetupChatLinkHook()
+        BotControl.InitializeData()
     elseif event == "PLAYER_LOGIN" then
-        db = BotControlConfig:GetDB()
-        BotControl.EnsureProfileStorage()
-        BotControl.InitializeFrame(BotControlFrame)
-        BotControl.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
-        BotControl_LayoutButtons()
-        BotControl.Load()
-        BotControl.RefreshProfileList()
+        BotControl.InitializePlayer()
     end
 end
 
@@ -3252,24 +3386,55 @@ function BotControl.OnFrameShow()
     end
 end
 
-function BotControl_OnLoad(frame)
-    local db
+function BotControl.InitializeData()
+    if BotControl.dataInitialized then
+        return true
+    end
 
     BotControlConfig:Initialize()
     BotControl.EnsureProfileStorage()
+    BotControl.SetupSlashCommands()
     BotControl.SetupChatLinkHook()
+    BotControl.dataInitialized = true
+
+    return true
+end
+
+function BotControl.InitializePlayer()
+    local db
+
+    if BotControl.playerInitialized or not BotControl.InitializeData() or not BotControlFrame then
+        return
+    end
+
     db = BotControlConfig:GetDB()
-    BotControl.InitializeFrame(frame)
-    BotControl_LayoutButtons()
     BotControl.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
+    BotControl.InitializeFrame(BotControlFrame)
+    BotControl_LayoutButtons()
     BotControl.Load()
     BotControl.RefreshProfileList()
     BotControl_UpdateFrameSizeForView("Profiles")
-    frame:SetScript("OnShow", BotControl.OnFrameShow)
     BotControl_ShowTab("Profiles")
-    eventFrame:RegisterEvent("ADDON_LOADED")
-    eventFrame:RegisterEvent("PLAYER_LOGIN")
-    eventFrame:SetScript("OnEvent", BotControl.HandleEvent)
+    BotControl.playerInitialized = true
+end
+
+function BotControl_OnLoad(frame)
+    if not frame then
+        return
+    end
+
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:SetScript("OnMouseDown", BotControl.OnMainFrameMouseDown)
+    frame:SetScript("OnMouseUp", BotControl.OnMainFrameMouseUp)
+    frame:SetScript("OnShow", BotControl.OnFrameShow)
+
+    if not BotControl.eventsRegistered then
+        eventFrame:RegisterEvent("ADDON_LOADED")
+        eventFrame:RegisterEvent("PLAYER_LOGIN")
+        eventFrame:SetScript("OnEvent", BotControl.HandleEvent)
+        BotControl.eventsRegistered = true
+    end
 end
 
 function BotControl_SaveButton_OnClick()
@@ -3281,7 +3446,7 @@ function BotControl_RunNamedAction(actionName)
 
     BotControl.Save()
 
-    handler = _G["BotControl_Action_" .. (actionName or "")]
+    handler = BotControl.Compat.GetGlobal("BotControl_Action_" .. (actionName or ""))
     if type(handler) == "function" then
         handler()
     elseif BotControlActions and BotControlActions.RunAction then

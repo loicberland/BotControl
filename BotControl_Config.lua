@@ -38,22 +38,6 @@ BotControlConfig.defaults = {
     }
 }
 
-local function CopyDefaults(target, defaults)
-    local key
-
-    if not target then
-        target = {}
-    end
-
-    for key in pairs(defaults) do
-        if target[key] == nil then
-            target[key] = defaults[key]
-        end
-    end
-
-    return target
-end
-
 local function CloneTable(source)
     local copy = {}
     local key
@@ -72,6 +56,26 @@ local function CloneTable(source)
     end
 
     return copy
+end
+
+local function CopyDefaults(target, defaults)
+    local key
+
+    if not target then
+        target = {}
+    end
+
+    for key in pairs(defaults) do
+        if target[key] == nil then
+            if type(defaults[key]) == "table" then
+                target[key] = CloneTable(defaults[key])
+            else
+                target[key] = defaults[key]
+            end
+        end
+    end
+
+    return target
 end
 
 function BotControlConfig:Initialize()

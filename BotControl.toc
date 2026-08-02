@@ -1,6 +1,6 @@
-## Interface: 20400
+## Interface: 11200
 ## Title: BotControl
-## Notes: Minimal command panel for managing playerbots on WoW 2.4.3
+## Notes: Command panel for CMaNGOS PlayerBots on WoW 1.12.1
 ## Author: OpenAI
 ## Version: 1.0.0
 ## SavedVariables: BotControlDB

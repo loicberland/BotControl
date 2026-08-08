@@ -194,22 +194,23 @@ BotControl.ClassSpecs = {
     ["Mage"] = {
         "pve dps arcane",
         "pve dps fire",
-        "pve dps frost",
+        "pve dps frost (frost-arcane)",
     },
     ["Démoniste"] = {
-        "pve dps destro",
         "pve dps affli",
+        "pve dps demo (ds/ruin)",
+        "pve dps dest (imp lord)",
     },
     ["Chaman"] = {
-        "pve resto",
-        "pve dps elem",
-        "pve dps enh",
+        "pve heal resto (pure)",
+        "pve dps elem (elemental mastery)",
+        "pvp dps enhan (2hand)",
     },
     ["Druide"] = {
-        "pve dps feral tank",
-        "pve resto",
-        "pve dps balance",
-        "pve dps feral cat",
+        "pve dps feral (dps/tank hybrid)",
+        "pve dps resto (swiftmend spec)",
+        "pve dps resto (resto-balance",
+        "pve dps feral",
     },
 }
 

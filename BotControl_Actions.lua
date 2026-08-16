@@ -451,7 +451,7 @@ function BotControlActions:AttackDPSCommands()
 
     AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
     AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")   
-    AddWhisperList(commands, cfg.roleNames.dps, "free")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "free")
     AddWhisperList(commands, cfg.roleNames.dps, "attack")
     AddWhisperList(commands, cfg.roleNames.dps, "pet defensive")
     AddWhisperList(commands, cfg.roleNames.dps, "pet attack")

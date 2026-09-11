@@ -32,7 +32,7 @@ BotControl.COMMAND_INTERVAL = 0.15
 BotControl.REPEAT_WHISPER_INTERVAL = 0.4
 BotControl.commandQueue = {}
 BotControl.commandQueueInterval = BotControl.COMMAND_INTERVAL
-BotControl.MAX_PROFILE_SLOTS = 25
+BotControl.MAX_PROFILE_SLOTS = 24
 BotControl.PROFILE_SLOT_ROWS = 5
 BotControl.PROFILE_SLOT_TOP_OFFSET = -102
 BotControl.PROFILE_SLOT_ROW_HEIGHT = 40
@@ -55,7 +55,7 @@ BotControl.PROFILE_FORMATS = {
     party5 = {
         key = "party5",
         label = "5 joueurs",
-        slotCount = 5,
+        slotCount = 4,
         columnCount = 1,
         frameHeight = 350,
         groupLayout = {
@@ -65,7 +65,7 @@ BotControl.PROFILE_FORMATS = {
     raid10 = {
         key = "raid10",
         label = "10 joueurs",
-        slotCount = 10,
+        slotCount = 9,
         columnCount = 1,
         frameHeight = 650,
         groupLayout = {
@@ -76,7 +76,7 @@ BotControl.PROFILE_FORMATS = {
     raid25 = {
         key = "raid25",
         label = "25 joueurs",
-        slotCount = 25,
+        slotCount = 24,
         columnCount = 3,
         frameHeight = 650,
         sidePanelGap = 50,
@@ -754,7 +754,7 @@ function BotControl.EnsureProfileStorage()
     end
 
     if not BotControl.HasAnySlotData(db.currentSlotsByFormat.party5.slots) then
-        db.currentSlotsByFormat.party5.slots = BotControl.NormalizeSlotsList(BotControl.BuildLegacySlotsFromDB(db), 5)
+        db.currentSlotsByFormat.party5.slots = BotControl.NormalizeSlotsList(BotControl.BuildLegacySlotsFromDB(db), BotControl.GetProfileSlotCount("party5"))
     end
 
     db.activeProfileFormat = BotControl.NormalizeProfileFormat(db.activeProfileFormat)
@@ -834,8 +834,10 @@ function BotControl.BuildSlotsFromProfile(profile, formatKey)
     local roleName
     local className
     local specName
+    local slotCount
 
     formatKey = BotControl.NormalizeProfileFormat(formatKey)
+    slotCount = BotControl.GetProfileSlotCount(formatKey)
     if type(profile) ~= "table" then
         return BotControl.NormalizeSlotsList(slots, BotControl.GetProfileSlotCount(formatKey))
     end
@@ -855,7 +857,7 @@ function BotControl.BuildSlotsFromProfile(profile, formatKey)
         profile.builds = {}
     end
 
-    for index = 1, 5 do
+    for index = 1, slotCount do
         if index == 1 then
             name, roleName, className, specName = BotControl.ExtractSlotSelection(nil, profile.bots.tank, "tank", profile.builds.tank)
         elseif index == 2 then
@@ -871,7 +873,7 @@ function BotControl.BuildSlotsFromProfile(profile, formatKey)
         slots[index] = BotControl.CreateProfileSlotEntry(name, roleName, className, specName, BotControl.GetDefaultRoleForSlotIndex(index))
     end
 
-    return BotControl.NormalizeSlotsList(slots, 5)
+    return BotControl.NormalizeSlotsList(slots, slotCount)
 end
 
 function BotControl.UpdateDropdownValue(dropdown, value, emptyText)

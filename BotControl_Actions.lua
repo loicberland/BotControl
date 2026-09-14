@@ -377,6 +377,30 @@ function BotControlActions:InitCommandsTank()
     local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
     AddWhisperList(commands, cfg.roleNames.tank, "stance tank", whisperDelay)
+
+    AddWhisperList(commands, cfg.roleNames.tank, "co +close,+pull,+tank assist,-ranged,-stealth,-behind", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "nc +tank assist,-stealth", whisperDelay)
+
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co +tank feral")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "nc +tank feral")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "de +tank feral")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "react +tank feral")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co -offheal")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co -cure")
+
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "co +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "nc +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "de +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "react +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "co -offheal")
+
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "co +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "nc +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "de +protection")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "react +protection")
+    
+    
+    
     AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti,?", whisperDelay)
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "ss divine protection", whisperDelay)
     return commands
@@ -421,7 +445,7 @@ function BotControlActions:AttackDPSCommands()
 
     AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
     AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")   
-    AddWhisperList(commands, cfg.roleNames.dps, "free")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "free")
     AddWhisperList(commands, cfg.roleNames.dps, "attack")
     AddWhisperList(commands, cfg.roleNames.dps, "pet defensive")
     AddWhisperList(commands, cfg.roleNames.dps, "pet attack")

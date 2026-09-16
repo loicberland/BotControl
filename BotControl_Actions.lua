@@ -338,7 +338,13 @@ function BotControlActions:InitCommands()
     local commands = {}
     local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
-    AddSlash(commands, "/run SetLootMethod('master', UnitName('player'))")
+-- Accès libre	/run SetLootMethod('freeforall')
+-- Chacun son tour	/run SetLootMethod('roundrobin')
+-- Butin de groupe	/run SetLootMethod('group')
+-- Besoin avant cupidité	/run SetLootMethod('needbeforegreed')
+-- Maître du butin — toi-même	/run SetLootMethod('master', UnitName('player'))
+
+    AddSlash(commands, "/run SetLootMethod('freeforall')")
     AddParty(commands, "ll -equip,-quest,-skill,-disenchant,-use,-vendor,-trash", whisperDelay)
     AddParty(commands, "stance near", whisperDelay)
     AddParty(commands, "formation arrow", whisperDelay)
@@ -347,10 +353,12 @@ function BotControlActions:InitCommands()
     AddParty(commands, "save mana 3", whisperDelay)
     AddParty(commands, "follow", whisperDelay)
     AddParty(commands, "pet defensive", whisperDelay)
-    AddParty(commands, "co -cc", whisperDelay)
-    AddParty(commands, "nc -grind", whisperDelay)
-    AddWhisperByClass(commands, cfg.namedSlots, "Chasseur", "ss growl")
+    -- AddParty(commands, "co -cc", whisperDelay)
     
+    AddWhisperList(commands, cfg.roleNames.dps, "co -cc", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.dps, "nc -grind", whisperDelay)
+    -- AddParty(commands, "nc -grind", whisperDelay)
+    AddWhisperByClass(commands, cfg.namedSlots, "Chasseur", "ss growl")
     -- AddParty(commands, "nc +passive")
     -- AddParty(commands, "co -passive")
     -- AddWhisperList(commands, cfg.roleNames.heal, "co -offdps,?")
@@ -399,9 +407,7 @@ function BotControlActions:InitCommandsTank()
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "de +protection")
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "react +protection")
     
-    
-    
-    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti,?", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti", whisperDelay)
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "ss divine protection", whisperDelay)
     return commands
 end
@@ -412,7 +418,10 @@ function BotControlActions:InitCommandsHeal()
     local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
     AddWhisperList(commands, cfg.roleNames.heal, "save mana 2", whisperDelay)
     AddWhisperList(commands, cfg.roleNames.heal, "co -offdps", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "nc -offdps", whisperDelay)
     AddWhisperList(commands, cfg.roleNames.heal, "co +aoe", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "co -cc", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "nc -grind", whisperDelay)
     return commands
 end
 

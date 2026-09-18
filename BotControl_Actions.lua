@@ -24,12 +24,18 @@ local function AddWhisper(commands, target, message, delayAfter)
     end
 end
 
-local function AddParty(commands, message)
+local function AddParty(commands, message, delayAfter)
     if BotControl.HasValue(message) then
-        table.insert(commands, {
+        local command = {
             type = "PARTY",
             message = message
-        })
+        }
+
+        if type(delayAfter) == "number" and delayAfter > 0 then
+            command.delayAfter = delayAfter
+        end
+
+        table.insert(commands, command)
     end
 end
 
@@ -336,7 +342,7 @@ end
 function BotControlActions:InitCommands()
     local cfg = self:GetConfig()
     local commands = {}
-    local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
+    local whisperDelay = 0.75 --BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
 -- Accès libre	/run SetLootMethod('freeforall')
 -- Chacun son tour	/run SetLootMethod('roundrobin')
@@ -384,31 +390,29 @@ function BotControlActions:InitCommandsTank()
     local commands = {}
     local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
-    AddWhisperList(commands, cfg.roleNames.tank, "stance tank", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "stance turnback", whisperDelay)
 
-    AddWhisperList(commands, cfg.roleNames.tank, "co +close,+pull,+tank assist,-ranged,-stealth,-behind", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.tank, "nc +tank assist,-stealth", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "co +close,+pull,+pull back,+tank assist,-dps assist,-ranged,-stealth,-behind", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "nc +tank assist,-dps assist,-stealth", whisperDelay)
 
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co +tank feral")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "nc +tank feral")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "de +tank feral")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "react +tank feral")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co -offheal")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co -cure")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "co +tank feral,-dps feral,-balance,-restoration,-offheal,-cure", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "nc +tank feral,-dps feral,-balance,-restoration", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "de +tank feral,-dps feral,-balance,-restoration", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Druide", "react +tank feral,-dps feral,-balance,-restoration", whisperDelay)
 
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "co +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "nc +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "de +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "react +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "co -offheal")
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "co +protection,-arms,-fury", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "nc +protection,-arms,-fury", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "de +protection,-arms,-fury", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Guerrier", "react +protection,-arms,-fury", whisperDelay)
 
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "co +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "nc +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "de +protection")
-    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "react +protection")
-    
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "co +protection,-holy,-retribution,-offheal", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "nc +protection,-holy,-retribution", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "de +protection,-holy,-retribution", whisperDelay)
+    AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "react +protection,-holy,-retribution", whisperDelay)
+
     AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti", whisperDelay)
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "ss divine protection", whisperDelay)
+
     return commands
 end
 
@@ -416,12 +420,11 @@ function BotControlActions:InitCommandsHeal()
     local cfg = self:GetConfig()
     local commands = {}
     local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
+
     AddWhisperList(commands, cfg.roleNames.heal, "save mana 2", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.heal, "co -offdps", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.heal, "nc -offdps", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.heal, "co +aoe", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.heal, "co -cc", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.heal, "nc -grind", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "co -offdps,-dps assist,-cc", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.heal, "nc -offdps,-dps assist,-grind", whisperDelay)
+
     return commands
 end
 
@@ -443,6 +446,7 @@ function BotControlActions:TankAttackCommands()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.tank, "attack")
+    AddWhisperList(commands, cfg.roleNames.tank, "do attack my target")
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "cast avenger's shield")
 
     return commands
@@ -455,7 +459,8 @@ function BotControlActions:AttackDPSCommands()
     AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
     AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")   
     -- AddWhisperList(commands, cfg.roleNames.dps, "free")
-    AddWhisperList(commands, cfg.roleNames.dps, "attack")
+    AddWhisperList(commands, cfg.roleNames.tank, "attack")
+    AddWhisperList(commands, cfg.roleNames.dps, "do attack my target")
     AddWhisperList(commands, cfg.roleNames.dps, "pet defensive")
     AddWhisperList(commands, cfg.roleNames.dps, "pet attack")
 
@@ -472,10 +477,11 @@ end
 
 function BotControlActions:PassiveCommands()
     local commands = {}
+    local whisperDelay = 0.75
 
-    AddParty(commands, "pet passive")
-    AddParty(commands, "nc +passive,?")
-    AddParty(commands, "co +passive,?")
+    AddParty(commands, "pet passive",whisperDelay)
+    AddParty(commands, "nc +passive",whisperDelay)
+    AddParty(commands, "co +passive",whisperDelay)
 
     return commands
 end

@@ -391,6 +391,7 @@ function BotControlActions:InitCommandsTank()
     local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
     AddWhisperList(commands, cfg.roleNames.tank, "stance turnback", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti", whisperDelay)
 
     AddWhisperList(commands, cfg.roleNames.tank, "co +close,+pull,+pull back,+tank assist,-dps assist,-ranged,-stealth,-behind", whisperDelay)
     AddWhisperList(commands, cfg.roleNames.tank, "nc +tank assist,-dps assist,-stealth", whisperDelay)
@@ -410,7 +411,6 @@ function BotControlActions:InitCommandsTank()
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "de +protection,-holy,-retribution", whisperDelay)
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "react +protection,-holy,-retribution", whisperDelay)
 
-    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti", whisperDelay)
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "ss divine protection", whisperDelay)
 
     return commands
@@ -434,9 +434,6 @@ function BotControlActions:SummonCommands()
     local index
 
     AddParty(commands, "summon")
-    -- for index = 1, table.getn(cfg.names) do
-    --     AddWhisper(commands, cfg.names[index], "summon")
-    -- end
 
     return commands
 end
@@ -448,6 +445,15 @@ function BotControlActions:TankAttackCommands()
     AddWhisperList(commands, cfg.roleNames.tank, "attack")
     AddWhisperList(commands, cfg.roleNames.tank, "do attack my target")
     AddWhisperByRoleAndClass(commands, cfg.namedSlots, "tank", "Paladin", "cast avenger's shield")
+
+    return commands
+end
+
+function BotControlActions:TankFleeCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.tank, "flee")
 
     return commands
 end
@@ -486,6 +492,15 @@ function BotControlActions:PassiveCommands()
     return commands
 end
 
+function BotControlActions:FleeCommands()
+    local commands = {}
+    local whisperDelay = 0.75
+
+    AddParty(commands, "flee",whisperDelay)
+
+    return commands
+end
+
 function BotControlActions:PassiveDPSCommands()
     local cfg = self:GetConfig()
     local commands = {}
@@ -507,12 +522,30 @@ function BotControlActions:WaitDPSCommands()
     return commands
 end
 
+function BotControlActions:FleeDPSCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.dps, "flee")
+
+    return commands
+end
+
 function BotControlActions:WaitHEALCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
     AddWhisperList(commands, cfg.roleNames.heal, "co +wait for attack")
     AddWhisperList(commands, cfg.roleNames.heal, "wait for attack time 1")
+
+    return commands
+end
+
+function BotControlActions:FleeHEALCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.heal, "flee")
 
     return commands
 end
@@ -581,7 +614,7 @@ function BotControlActions:InitBotsCommands()
     return commands
 end
 
-function BotControlActions:ComposeGroupCommands()
+function BotControlActions:LeaveGroupCommands()
     local cfg = self:GetConfig()
     local commands = {}
     local index
@@ -594,6 +627,20 @@ function BotControlActions:ComposeGroupCommands()
 
     for index = 1, table.getn(cfg.names) do
         AddWhisper(commands, cfg.names[index], "leave group")
+    end
+
+    return commands
+end
+
+function BotControlActions:ComposeGroupCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    local index
+    local name
+
+    for index = 1, table.getn(cfg.names) do
+        name = cfg.names[index]
+        AddSlash(commands, ".bot add " .. name)
     end
 
     for index = 1, table.getn(cfg.names) do

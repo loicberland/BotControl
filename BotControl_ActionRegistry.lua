@@ -2,14 +2,27 @@ BotControl = BotControl or {}
 
 BotControl.ActionRegistry = {
     {
+        key = "LeaveGroup",
+        label = "Dissout le groupe",
+        tooltipTitle = "Dissoudre le groupe",
+        tooltipDescription = "Dissout le groupe avec les bots configures",
+        texture = "Interface\\Icons\\Ability_Hunter_BeastSoothe",
+        tab = "Config",
+        group = "Config",
+        order = 10,
+        aliases = { "dissout", "leavegroup" },
+        builder = "LeaveGroupCommands",
+        queued = false
+    },
+    {
         key = "ComposeGroup",
         label = "Composer le groupe",
         tooltipTitle = "Composer le groupe",
         tooltipDescription = "Cree le groupe avec les bots configures",
-        texture = "Interface\\Icons\\Spell_Nature_MassTeleport",
+        texture = "Interface\\Icons\\INV_Misc_GroupNeedMore",
         tab = "Config",
         group = "Config",
-        order = 10,
+        order = 11,
         aliases = { "compose", "composegroup" },
         builder = "ComposeGroupCommands",
         queued = false
@@ -106,6 +119,19 @@ BotControl.ActionRegistry = {
         queued = false
     },
     {
+        key = "TankFlee",
+        label = "Abandon du tank",
+        tooltipTitle = "Abandon du tank",
+        tooltipDescription = "Ordonne au tank d'abandonner",
+        texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
+        tab = "Combat",
+        group = "Tank",
+        order = 11,
+        aliases = { "tankflee", "tank flee" },
+        builder = "TankFleeCommands",
+        queued = false
+    },
+    {
         key = "AttackDPS",
         label = "Attaque DPS",
         tooltipTitle = "Attaque DPS",
@@ -158,6 +184,19 @@ BotControl.ActionRegistry = {
         queued = false
     },
     {
+        key = "DpsFlee",
+        label = "Abandon des dps",
+        tooltipTitle = "Abandon des dps",
+        tooltipDescription = "Ordonne au dps d'abandonner",
+        texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
+        tab = "Combat",
+        group = "DPS",
+        order = 41,
+        aliases = { "dpsflee" },
+        builder = "FleeDPSCommands",
+        queued = false
+    },
+    {
         key = "WaitHEAL",
         label = "Wait HEAL",
         tooltipTitle = "Wait HEAL",
@@ -167,7 +206,20 @@ BotControl.ActionRegistry = {
         group = "Heal",
         order = 10,
         aliases = { "waitheal"},
-        builder = "WaitHEALCommands",
+        builder = "FleeHEALCommands",
+        queued = false
+    },
+    {
+        key = "HealFlee",
+        label = "Abandon du heals",
+        tooltipTitle = "Abandon du heal",
+        tooltipDescription = "Ordonne au heal d'abandonner",
+        texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
+        tab = "Combat",
+        group = "Heal",
+        order = 11,
+        aliases = { "healflee" },
+        builder = "FleeHealCommands",
         queued = false
     },
     {
@@ -194,6 +246,19 @@ BotControl.ActionRegistry = {
         order = 20,
         aliases = { "passive" },
         builder = "PassiveCommands",
+        queued = false
+    },
+    {
+        key = "Flee",
+        label = "Abandon",
+        tooltipTitle = "Abandon",
+        tooltipDescription = "Ordonne d'abandonner",
+        texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
+        tab = "Combat",
+        group = "All",
+        order = 21,
+        aliases = { "flee" },
+        builder = "FleeCommands",
         queued = false
     },
     {

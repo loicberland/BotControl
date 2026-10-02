@@ -670,6 +670,21 @@ function BotControlActions:RunAction(actionKey)
     if not action then
         return
     end
+        
+    if action.raidMark ~= nil then
+        if not UnitExists("target") then
+            BotControl.Print("Selectionne une cible a marquer.")
+            return
+        end
+
+        local currentMark = GetRaidTargetIndex("target") or 0
+
+        if currentMark ~= action.raidMark then
+            SetRaidTarget("target", action.raidMark)
+        end
+
+        return
+    end
 
     sequence = action.sequence
     if type(sequence) == "table" and table.getn(sequence) > 0 then
@@ -733,3 +748,4 @@ end
 
 BotControlActions:RefreshDefinitions()
 BotControlActions.CreateLegacyActionWrappers()
+

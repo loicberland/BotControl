@@ -1,8 +1,8 @@
 ## Interface: 20400
 ## Title: BotControl
-## Notes: Minimal command panel for managing playerbots on WoW 2.4.3
+## Notes: Group profiles and configurable playerbot action bar for WoW 2.4.3
 ## Author: OpenAI
-## Version: 1.0.0
+## Version: 1.1.0
 ## SavedVariables: BotControlDB
 ## SavedVariablesPerCharacter: BotControlCharacterDB
 
@@ -10,4 +10,6 @@ BotControl_Config.lua
 BotControl_ActionRegistry.lua
 BotControl_Actions.lua
 BotControl.lua
+BotControl_Bar.lua
 BotControl.xml
+

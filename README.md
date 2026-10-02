@@ -1,276 +1,162 @@
-# BotControl
+# BotControl 1.1.0 — WoW TBC 2.4.3
 
-Addon WoW 2.4.3 pour piloter des bots via une interface simple.
+Composition de groupes et barre indépendante pour piloter les playerbots.
+Version construite à partir de la branche 2.4.3 du dépôt loicberland/BotControl,
+consultée le 2 octobre 2026.
 
-## Structure
+## Installation
 
-- `BotControl_ActionRegistry.lua`
-  Registre central declaratif des actions.
-- `BotControl_Actions.lua`
-  Builders des commandes et execution des actions.
-- `BotControl.lua`
-  UI, slash commands, layout et generation des boutons.
-- `BotControl_Config.lua`
-  Stockage et chargement des profils.
-- `BotControl.xml`
-  Frame principale et quelques boutons XML historiques.
+1. Quitter complètement WoW.
+2. Remplacer le dossier `Interface/AddOns/BotControl` par celui du ZIP.
+3. Vérifier le chemin : `Interface/AddOns/BotControl/BotControl.toc`.
+4. Relancer le jeu. La barre apparaît vers le centre, légèrement en dessous.
 
-## Principe actuel
+Les profils et compositions existants sont conservés. Ne pas supprimer les
+fichiers BotControl des dossiers `WTF/.../SavedVariables`.
 
-Les actions ne sont plus decrites a plusieurs endroits.
+## Profils et formats 5 / 10 / 25
 
-La source de verite est maintenant :
+Le premier bouton de la barre affiche le format actif : 5, 10 ou 25.
 
-- `BotControl.ActionRegistry`
+- Clic gauche : ouvrir/fermer la fenêtre de composition.
+- Clic droit : ouvrir/fermer les réglages de la barre.
+- `/bc` ou `/botcontrol` : ouvrir/fermer la fenêtre de composition.
+- `/bc options` ou `/bc barre` : ouvrir/fermer les réglages.
 
-Chaque action declare en un seul bloc :
+Dans la fenêtre Profils, sélectionner 5, 10 ou 25 joueurs, puis sélectionner
+un profil enregistré et utiliser son bouton de chargement, comme auparavant.
+Les listes contiennent respectivement 4, 9 ou 24 bots : le joueur occupe la
+place restante. Modifier le format ou charger un profil n'invite personne.
+Le bouton « Composer le groupe » lance les commandes de composition existantes.
+« Appliquer » sauvegarde la composition courante ; le bouton de sauvegarde de
+profil l'enregistre sous le nom saisi. Fermer la fenêtre conserve aussi les
+modifications de la composition courante.
 
-- sa cle interne
-- son label
-- son icone
-- son tooltip
-- son sous-onglet
-- son groupe visuel
-- son ordre
-- ses alias slash
-- son builder
-- si elle doit etre queuee
-- eventuellement une `sequence`
+L'infobulle du premier bouton indique le dernier profil chargé/enregistré pour
+le format actif. La composition peut avoir été retouchée depuis son chargement.
+Un simple clic dans la liste de profils ne change pas ce dernier profil chargé.
 
-Exemple :
+## Barre d'actions
 
-```lua
-{
-    key = "ComposeGroup",
-    label = "Composer le groupe",
-    tooltipTitle = "Composer le groupe",
-    tooltipDescription = "Cree le groupe avec les bots configures",
-    texture = "Interface\\Icons\\Spell_Nature_MassTeleport",
-    tab = "Config",
-    group = "Config",
-    order = 10,
-    aliases = { "compose" },
-    builder = "ComposeGroupCommands",
-    queued = false
-}
-```
+Cinq catégories fixes : Config du groupe, Tank, DPS, Heal et Général.
 
-## Ce qui est genere automatiquement
+| Bouton | Clic gauche | Clic droit |
+| --- | --- | --- |
+| Principal d'une catégorie | Exécuter l'action affichée | Ouvrir/fermer le sous-menu |
+| Action du sous-menu | Exécuter et laisser le menu ouvert | Définir comme principal et fermer ce menu |
+| Raccourci personnalisé | Exécuter | Choisir son affectation |
+| Raccourci vide | Choisir son affectation | Choisir son affectation |
 
-A partir du registre, l'addon reconstruit automatiquement :
+Plusieurs sous-menus peuvent rester ouverts simultanément. Ils ne se ferment
+ni au déplacement de la souris, ni au clic ailleurs, ni après un délai.
+Un petit astérisque repère l'action principale dans chaque sous-menu.
+Les menus sont fermés au démarrage/rechargement, mais les actions principales
+choisies sont conservées.
 
-- `BotControl.ACTION_BUTTON_CONFIG`
-- `BotControl.ACTION_COMMAND_ORDER`
-- `BotControl.ACTION_COMMAND_ALIASES`
-- `BotControl.ACTION_BY_KEY`
-- `BotControl.ACTIONS_BY_TAB`
-- `BotControl.ACTIONS_BY_GROUP`
+Les initialisations Tank et Heal se trouvent dans leur catégorie respective.
+Les commandes slash et fonctions historiques sont conservées. Exemples :
+`/bc tankattack`, `/bc attackdps`, `/bc follow`, `/bc stay`, `/bc help`.
 
-Le registre sert aussi a :
+## Réglages
 
-- resoudre les slash commands `/bc ...`
-- construire l'aide `/bc help`
-- creer les boutons d'action
-- enregistrer les boutons dans les bons groupes UI
-- positionner les boutons dans le layout
-- executer les actions via `builder`, `queued` ou `sequence`
+- Barre horizontale ou verticale.
+- Sous-menus perpendiculaires : haut/bas ou gauche/droite.
+- Taille des boutons : 24 à 64 pixels.
+- Espacement : 0 à 16 pixels.
+- Raccourcis personnalisés : 0 à 10, issus de n'importe quelle catégorie.
+- Position verrouillable. Déverrouiller pour afficher la poignée de déplacement.
+- Bouton « Recentrer la barre » si nécessaire.
+- Libellés courts facultatifs : Grp, Cfg, Tank, DPS, Heal, Gen et P1…P10.
 
-## Onglet Actions
+Les raccourcis s'affectent soit par clic droit directement sur la barre, soit
+par les boutons de la fenêtre Réglages. Le sélecteur permet de filtrer par
+catégorie et de vider un emplacement. Réduire leur nombre masque les derniers
+emplacements sans effacer leurs affectations.
 
-Les sous-onglets existants restent :
+Position, apparence, principaux et raccourcis sont sauvegardés par personnage,
+dans `BotControlCharacterDB.actionBar`, indépendamment des compositions 5/10/25.
+Changer de profil ne réorganise pas la barre.
 
-- `Config`
-- `Combat`
+Choisir un sens d'ouverture et une taille compatibles avec la place disponible
+sur l'écran, en particulier avec dix raccourcis sur une barre verticale.
 
-La presentation `Combat` conserve les groupes visuels :
+## Ajouter une action dans le code
 
-- `Tank`
-- `DPS`
-- `Heal`
-- `All`
+Les actions sont définies dans `BotControl_ActionRegistry.lua`.
+Le champ `group` décide de la catégorie de la barre :
 
-Le layout est maintenant calcule a partir du registre :
+| Valeur | Catégorie |
+| --- | --- |
+| `Config` | Config du groupe |
+| `Tank` | Tank |
+| `DPS` | DPS |
+| `Heal` | Heal |
+| `All` | Général |
 
-- `Config` affiche les actions `tab = "Config"` triees par `order`
-- `Combat` affiche les actions `tab = "Combat"` regroupees par `group`, puis triees par `order`
+`order` décide de l'ordre dans le sous-menu. `key` est l'identifiant stable
+sauvegardé pour les boutons principaux et les raccourcis : éviter de le renommer.
+Conserver `tab = "Config"` pour Config, `tab = "Combat"` pour les autres catégories,
+pour la compatibilité avec les anciennes tables et l'aide.
 
-## Slash commands
-
-Le slash principal reste :
-
-- `/bc`
-
-Sans argument :
-
-- ouvre ou ferme l'interface
-
-Avec un argument :
-
-- execute une action declaree dans le registre
-
-Exemples :
-
-- `/bc build`
-- `/bc init`
-- `/bc compose`
-- `/bc summon`
-- `/bc initbots`
-- `/bc tankattack`
-- `/bc tank attack`
-- `/bc tank-attack`
-- `/bc tank_attack`
-- `/bc attackdps`
-- `/bc attack dps`
-- `/bc passive`
-- `/bc passive dps`
-- `/bc help`
-
-Les alias avec espaces, tirets et underscores sont toujours normalises.
-
-## Execution des actions
-
-Le point d'entree UI et slash reste :
-
-- `BotControl_RunNamedAction(actionKey)`
-
-Puis :
-
-1. l'action est resolue dans `BotControl.ACTION_BY_KEY`
-2. `BotControlActions:RunAction(actionKey)` lit le registre
-3. si l'action declare `sequence`, chaque action de la sequence est lancee
-4. sinon le `builder` est appele
-5. `PrepareCommands()` developpe les tokens de role
-6. l'execution passe par :
-   - `BotControl.RunCommands(...)`
-   - ou `BotControl.RunCommandsQueued(...)` si `queued = true`
-
-Cas particuliers conserves :
-
-- `InitBots` reste queuee
-- `FullSetup` lance `Build` puis `Init`
-
-## Ajouter un nouveau bouton d'action
-
-Pour ajouter une action simple, il faut maintenant :
-
-1. ajouter une entree dans `BotControl.ActionRegistry`
-2. ajouter un builder dans `BotControl_Actions.lua` seulement si l'action a une logique nouvelle
-
-Il ne faut plus modifier manuellement :
-
-- le layout
-- `ACTION_BUTTON_CONFIG`
-- `ACTION_COMMAND_ORDER`
-- `ACTION_COMMAND_ALIASES`
-- la creation du bouton
-- l'enregistrement dans `BotControl_ActionElements`
-- l'enregistrement dans `BotControl_ActionConfigElements`
-- l'enregistrement dans `BotControl_ActionCombatElements`
-
-### Exemple complet
-
-Ajouter cette entree dans `BotControl.ActionRegistry` :
+Exemple à ajouter au registre :
 
 ```lua
 {
     key = "MyNewAction",
     label = "Mon action",
     tooltipTitle = "Mon action",
-    tooltipDescription = "Lance une commande de test",
-    texture = "Interface\\Icons\\INV_Misc_QuestionMark",
+    tooltipDescription = "Ordonne au groupe de suivre",
+    texture = "Interface\\Icons\\Ability_Hunter_Pathfinding",
     tab = "Combat",
     group = "All",
     order = 100,
-    aliases = { "mynewaction", "my new action" },
+    aliases = { "mynewaction" },
     builder = "MyNewActionCommands",
     queued = false
 }
 ```
 
-Puis ajouter le builder :
+Puis dans `BotControl_Actions.lua`, où `AddParty` est disponible :
 
 ```lua
 function BotControlActions:MyNewActionCommands()
     local commands = {}
-
     AddParty(commands, "follow")
-
     return commands
 end
 ```
 
-C'est tout.
+Après `/reload`, l'action apparaît dans le sous-menu Général, dans le sélecteur
+de raccourcis et via `/bc mynewaction`. Aucun bouton à créer manuellement.
+Le sélecteur est paginé pour accepter de nouvelles actions.
 
-Le bouton sera :
+## Organisation des fichiers
 
-- cree automatiquement
-- stylise automatiquement
-- visible dans le bon sous-onglet
-- place automatiquement dans le layout
-- disponible via `/bc mynewaction`
+- `BotControl_Bar.lua` : barre, sous-menus, sélecteur et réglages.
+- `BotControl_ActionRegistry.lua` : définition et classement des actions.
+- `BotControl_Actions.lua` : génération et exécution des commandes.
+- `BotControl.lua` : composition, profils, commandes slash et moteur existant.
+- `BotControl_Config.lua` : stockage des données.
+- `BotControl.xml` : fenêtre de composition et contrôles historiques.
 
-## Champs utiles du registre
+## Corrections associées
 
-- `key`
-  Cle interne unique.
-- `label`
-  Texte logique du bouton.
-- `tooltipTitle`
-  Titre du tooltip.
-- `tooltipDescription`
-  Description du tooltip.
-- `texture`
-  Texture d'icone.
-- `tab`
-  `Config` ou `Combat`.
-- `group`
-  `Config`, `Tank`, `DPS`, `Heal` ou `All`.
-- `order`
-  Ordre d'affichage.
-- `aliases`
-  Alias slash explicites.
-- `builder`
-  Nom de la fonction `...Commands()`.
-- `queued`
-  Utilise `RunCommandsQueued`.
-- `sequence`
-  Sequence d'actions au lieu d'un builder direct.
+Deux raccordements existants ont été corrigés dans le registre :
+- `WaitHEAL` appelle maintenant `WaitHEALCommands` (attente), et non la fuite.
+- `HealFlee` appelle `FleeHEALCommands`, avec la casse du vrai nom de fonction.
 
-## Compatibilite
+Les commandes serveur et leurs délais restent ceux de la version d'origine.
+La nouvelle barre utilise le même moteur d'envoi, y compris pour les séquences.
 
-La refonte conserve :
+## Validation
 
-- la compatibilite WoW 2.4.3 / Lua 5.1
-- les builders existants
-- les sous-onglets `Config` et `Combat`
-- les groupes visuels `Tank / DPS / Heal / All`
-- les slash commands `/bc ...`
-- la normalisation des alias
-- les wrappers globaux `BotControl_Action_<Key>`
-- les noms globaux de boutons historiques quand ils existent deja
+Syntaxe de tous les fichiers Lua vérifiée avec le parseur Lua 5.4 disponible ;
+le code ajouté utilise la syntaxe et les API prévues pour Lua 5.1 / WoW 2.4.3.
+Simulation hors jeu : migration d'une configuration existante, sauvegarde et
+chargement des profils, formats 5/10/25, clics, menus indépendants, choix du
+principal, raccourcis 0 à 10, quatre sens d'ouverture, réglages, dispatch des
+commandes et persistance après rechargement.
 
-Les boutons historiques definis en XML sont reutilises.
-Les nouveaux boutons suivent par defaut la convention :
-
-- `BotControl<Key>Button`
-
-## Actions actuellement declarees
-
-Config :
-
-- `ComposeGroup`
-- `Build`
-- `Init`
-- `FullSetup`
-- `Summon`
-- `InitBots`
-
-Combat :
-
-- `TankAttack`
-- `AttackDPS`
-- `PassiveDPS`
-- `Follow`
-- `Passive`
-- `Stay`
-- `Used`
+Le client WoW 2.4.3 n'est pas disponible dans cet environnement : rendu final,
+interactions réelles et réponse des bots restent à vérifier en jeu, notamment
+pendant un combat. Aucun test dans le client n'est revendiqué.

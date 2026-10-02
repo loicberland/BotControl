@@ -151,3 +151,4 @@ function BotControlConfig:SaveFromUI(frame)
         self:SetValue(key, text)
     end
 end
+

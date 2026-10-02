@@ -71,9 +71,10 @@ BotControl.ActionRegistry = {
         label = "Initialiser les tank",
         tooltipTitle = "Initialiser les tank",
         tooltipDescription = "Applique la configuration de base des bots tank",
-        texture = "Interface\\Icons\\Ability_Warrior_DefensiveStance.blp",
-        tab = "Config",
-        group = "Config",
+        -- texture = "Interface\\Icons\\Ability_Warrior_DefensiveStance.blp",
+        texture = "Interface\\Icons\\INV_Misc_Book_09",
+        tab = "Combat",
+        group = "Tank",
         order = 41,
         aliases = { "initTank" },
         builder = "InitCommandsTank",
@@ -84,9 +85,10 @@ BotControl.ActionRegistry = {
         label = "Initialiser les heal",
         tooltipTitle = "Initialiser les heal",
         tooltipDescription = "Applique la configuration de base des botsheal",
-        texture = "Interface\\Icons\\Spell_Holy_Heal.blp",
-        tab = "Config",
-        group = "Config",
+        -- texture = "Interface\\Icons\\Spell_Holy_Heal.blp",
+        texture = "Interface\\Icons\\INV_Misc_Book_09",
+        tab = "Combat",
+        group = "Heal",
         order = 42,
         aliases = { "initHeal" },
         builder = "InitCommandsHeal",
@@ -206,7 +208,7 @@ BotControl.ActionRegistry = {
         group = "Heal",
         order = 10,
         aliases = { "waitheal"},
-        builder = "FleeHEALCommands",
+        builder = "WaitHEALCommands",
         queued = false
     },
     {
@@ -219,7 +221,7 @@ BotControl.ActionRegistry = {
         group = "Heal",
         order = 11,
         aliases = { "healflee" },
-        builder = "FleeHealCommands",
+        builder = "FleeHEALCommands",
         queued = false
     },
     {
@@ -312,7 +314,8 @@ local ACTION_GROUP_ORDER = {
     Tank = 1,
     DPS = 2,
     Heal = 3,
-    All = 4
+    All = 4,
+    Marks = 5
 }
 
 local function TrimText(text)
@@ -423,7 +426,8 @@ function BotControl.BuildActionLookupTables()
             Tank = {},
             DPS = {},
             Heal = {},
-            All = {}
+            All = {},
+            Marks = {}
         }
     }
     local slashMap = {}
@@ -479,4 +483,46 @@ function BotControl.BuildActionLookupTables()
     BotControl.ACTION_SLASH_MAP = slashMap
 end
 
+local raidMarkNames = {
+    "Etoile",
+    "Cercle",
+    "Losange",
+    "Triangle",
+    "Lune",
+    "Carre",
+    "Croix",
+    "Crane"
+}
+
+for index, name in ipairs(raidMarkNames) do
+    table.insert(BotControl.ActionRegistry, {
+        key = "RaidMark" .. index,
+        label = name,
+        tooltipTitle = name,
+        tooltipDescription = "Applique cette marque a votre cible.",
+        texture = "Interface\\TargetingFrame\\UI-RaidTargetingIcons",
+        tab = "Combat",
+        group = "Marks",
+        order = index,
+        aliases = { "mark" .. index },
+        raidMark = index,
+        queued = false
+    })
+end
+
+table.insert(BotControl.ActionRegistry, {
+    key = "RaidMark0",
+    label = "Retirer la marque",
+    tooltipTitle = "Retirer la marque",
+    tooltipDescription = "Retire la marque de votre cible.",
+    texture = "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
+    tab = "Combat",
+    group = "Marks",
+    order = 9,
+    aliases = { "mark0" },
+    raidMark = 0,
+    queued = false
+})
+
 BotControl.BuildActionLookupTables()
+

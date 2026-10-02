@@ -1119,7 +1119,7 @@ function BotControl.Toggle()
     if BotControlFrame:IsShown() then
         BotControlFrame:Hide()
     else
-        BotControl_LayoutButtons()
+        BotControl_ShowTab("Profiles")
         BotControlFrame:Show()
     end
 end
@@ -2141,6 +2141,10 @@ function BotControl_ShowActionsSubTab(tabName)
 end
 
 function BotControl_ShowTab(tabName)
+    if tabName == "Actions" and BotControlBar then
+        BotControlBar:ToggleOptions()
+        return
+    end
     local index
     local element
 
@@ -2554,6 +2558,7 @@ function BotControl_SaveProfile(profileName)
     BotControl.selectedProfileNamesByFormat[formatKey] = profileName
     BotControl.selectedProfileName = profileName
     BotControl_SelectedProfileName = profileName
+    if BotControlBar then BotControlBar:RememberProfile(profileName) end
     BotControl.RefreshProfileList()
 end
 
@@ -2580,6 +2585,7 @@ function BotControl_LoadProfile(profileName)
     BotControl.selectedProfileNamesByFormat[formatKey] = profileName
     BotControl.selectedProfileName = profileName
     BotControl_SelectedProfileName = profileName
+    if BotControlBar then BotControlBar:RememberProfile(profileName) end
     BotControl.RefreshProfileList()
 end
 
@@ -2597,6 +2603,9 @@ function BotControl_DeleteProfile(profileName)
     end
 
     profiles[profileName] = nil
+    if BotControlBar and BotControlBar:GetDB().profileNames[formatKey] == profileName then
+        BotControlBar:RememberProfile(nil)
+    end
     if BotControl.selectedProfileName == profileName then
         BotControl.selectedProfileName = nil
     end
@@ -2927,6 +2936,7 @@ function BotControl_LayoutButtons()
 
     BotControl.LayoutProfileFields(frame)
     BotControl.UpdateProfileSubTabs()
+    if BotControlBar then BotControlBar:LayoutProfiles() end
 
 end
 
@@ -3190,6 +3200,7 @@ function BotControl.SetupSlashCommands()
     local index
 
     SLASH_BOTCONTROL1 = "/bc"
+    SLASH_BOTCONTROL2 = "/botcontrol"
     SlashCmdList["BOTCONTROL"] = function(message)
         local trimmedMessage = BotControl.Trim(message or "")
         local actionName
@@ -3201,8 +3212,12 @@ function BotControl.SetupSlashCommands()
         end
 
         normalizedMessage = BotControl.NormalizeCommandAlias(trimmedMessage)
+        if normalizedMessage == "options" or normalizedMessage == "barre" then
+            BotControlBar:ToggleOptions()
+            return
+        end
         if normalizedMessage == "help" or normalizedMessage == "aide" then
-            BotControl.Print("Sans argument, /bc ouvre ou ferme l'interface.")
+            BotControl.Print("/bc ou /botcontrol : profils. /bc options : reglages de la barre.")
             helpLines = BotControl.GetActionSlashHelpLines()
             for index = 1, table.getn(helpLines) do
                 BotControl.Print(helpLines[index])
@@ -3240,6 +3255,7 @@ function BotControl.HandleEvent()
         BotControl_LayoutButtons()
         BotControl.Load()
         BotControl.RefreshProfileList()
+        if BotControlBar then BotControlBar:Initialize() end
     end
 end
 
@@ -3268,6 +3284,7 @@ function BotControl_OnLoad(frame)
     BotControl.RefreshProfileList()
     BotControl_UpdateFrameSizeForView("Profiles")
     frame:SetScript("OnShow", BotControl.OnFrameShow)
+    frame:SetScript("OnHide", function() BotControl.Save() end)
     BotControl_ShowTab("Profiles")
     eventFrame:RegisterEvent("ADDON_LOADED")
     eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -3290,3 +3307,4 @@ function BotControl_RunNamedAction(actionName)
         BotControlActions:RunAction(actionName)
     end
 end
+

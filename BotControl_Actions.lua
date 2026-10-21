@@ -388,10 +388,11 @@ end
 function BotControlActions:InitCommandsTank()
     local cfg = self:GetConfig()
     local commands = {}
-    local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
+    local whisperDelay = 0.75 --BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
     AddWhisperList(commands, cfg.roleNames.tank, "stance turnback", whisperDelay)
-    AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti", whisperDelay)
+    -- AddWhisperList(commands, cfg.roleNames.tank, "co +mark rti", whisperDelay)
+    AddWhisperList(commands, cfg.roleNames.tank, "rti none", whisperDelay)
 
     AddWhisperList(commands, cfg.roleNames.tank, "co +close,+pull,+pull back,+tank assist,-dps assist,-ranged,-stealth,-behind", whisperDelay)
     AddWhisperList(commands, cfg.roleNames.tank, "nc +tank assist,-dps assist,-stealth", whisperDelay)
@@ -419,7 +420,7 @@ end
 function BotControlActions:InitCommandsHeal()
     local cfg = self:GetConfig()
     local commands = {}
-    local whisperDelay = BotControl.REPEAT_WHISPER_INTERVAL or 0.4
+    local whisperDelay = 0.75 --BotControl.REPEAT_WHISPER_INTERVAL or 0.4
 
     AddWhisperList(commands, cfg.roleNames.heal, "save mana 2", whisperDelay)
     AddWhisperList(commands, cfg.roleNames.heal, "co -offdps,-dps assist,-cc", whisperDelay)
@@ -462,12 +463,12 @@ function BotControlActions:AttackDPSCommands()
     local cfg = self:GetConfig()
     local commands = {}
 
-    AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
-    AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")   
+    -- AddWhisperList(commands, cfg.roleNames.dps, "co -passive,?")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "nc -passive,?")   
     -- AddWhisperList(commands, cfg.roleNames.dps, "free")
     AddWhisperList(commands, cfg.roleNames.dps, "do attack my target")
-    AddWhisperList(commands, cfg.roleNames.dps, "pet defensive")
-    AddWhisperList(commands, cfg.roleNames.dps, "pet attack")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "pet defensive")
+    -- AddWhisperList(commands, cfg.roleNames.dps, "pet attack")
 
     return commands
 end

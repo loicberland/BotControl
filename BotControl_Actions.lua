@@ -432,9 +432,35 @@ end
 function BotControlActions:SummonCommands()
     local cfg = self:GetConfig()
     local commands = {}
-    local index
 
     AddParty(commands, "summon")
+
+    return commands
+end
+
+function BotControlActions:TankSummonCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.tank, "summon")
+
+    return commands
+end
+
+function BotControlActions:DPSSummonCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+
+    AddWhisperList(commands, cfg.roleNames.dps, "summon")
+
+    return commands
+end
+
+function BotControlActions:HealSummonCommands()
+    local cfg = self:GetConfig()
+    local commands = {}
+    
+    AddWhisperList(commands, cfg.roleNames.heal, "summon")
 
     return commands
 end

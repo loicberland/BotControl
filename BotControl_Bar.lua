@@ -1,6 +1,6 @@
 -- BotControl 2.4.3: independent action bar. Only bot commands, no protected spells.
 BotControlBar = { categories = {
-    { key = "Config", label = "Config", default = "ComposeGroup" },
+    { key = "Config", label = "Config", default = "Summon" },
     { key = "Tank", label = "Tank", default = "TankAttack" },
     { key = "DPS", label = "DPS", default = "AttackDPS" },
     { key = "Heal", label = "Heal", default = "WaitHEAL" },

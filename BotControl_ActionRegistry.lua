@@ -35,7 +35,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Marksmanship",
         tab = "Config",
         group = "Config",
-        order = 20,
+        order = 12,
         aliases = { "build" },
         builder = "BuildCommands",
         queued = false
@@ -48,7 +48,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\INV_Misc_Gear_01",
         tab = "Config",
         group = "Config",
-        order = 30,
+        order = 13,
         aliases = { "initbots", "init bots" },
         builder = "InitBotsCommands",
         queued = true
@@ -61,37 +61,9 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\INV_Misc_Book_09",
         tab = "Config",
         group = "Config",
-        order = 40,
+        order = 14,
         aliases = { "init" },
         builder = "InitCommands",
-        queued = true
-    },
-    {
-        key = "InitTank",
-        label = "Initialiser les tank",
-        tooltipTitle = "Initialiser les tank",
-        tooltipDescription = "Applique la configuration de base des bots tank",
-        -- texture = "Interface\\Icons\\Ability_Warrior_DefensiveStance.blp",
-        texture = "Interface\\Icons\\INV_Misc_Book_09",
-        tab = "Combat",
-        group = "Tank",
-        order = 41,
-        aliases = { "initTank" },
-        builder = "InitCommandsTank",
-        queued = true
-    },
-    {
-        key = "InitHeal",
-        label = "Initialiser les heal",
-        tooltipTitle = "Initialiser les heal",
-        tooltipDescription = "Applique la configuration de base des botsheal",
-        -- texture = "Interface\\Icons\\Spell_Holy_Heal.blp",
-        texture = "Interface\\Icons\\INV_Misc_Book_09",
-        tab = "Combat",
-        group = "Heal",
-        order = 42,
-        aliases = { "initHeal" },
-        builder = "InitCommandsHeal",
         queued = true
     },
     {
@@ -102,9 +74,22 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Spell_Shadow_Teleport",
         tab = "Config",
         group = "Config",
-        order = 100,
+        order = 15,
         aliases = { "summon" },
         builder = "SummonCommands",
+        queued = false
+    },
+    {
+        key = "SummonTank",
+        label = "Invocation",
+        tooltipTitle = "Invocation",
+        tooltipDescription = "Invoque tous les tank",
+        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
+        tab = "Combat",
+        group = "Tank",
+        order = 10,
+        aliases = { "tanksummon" },
+        builder = "TankSummonCommands",
         queued = false
     },
     {
@@ -115,7 +100,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Warrior_Charge",
         tab = "Combat",
         group = "Tank",
-        order = 10,
+        order = 11,
         aliases = { "tankattack", "tank attack" },
         builder = "TankAttackCommands",
         queued = false
@@ -128,9 +113,36 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
         tab = "Combat",
         group = "Tank",
-        order = 11,
+        order = 12,
         aliases = { "tankflee", "tank flee" },
         builder = "TankFleeCommands",
+        queued = false
+    },
+    {
+        key = "InitTank",
+        label = "Initialiser les tank",
+        tooltipTitle = "Initialiser les tank",
+        tooltipDescription = "Applique la configuration de base des bots tank",
+        -- texture = "Interface\\Icons\\Ability_Warrior_DefensiveStance.blp",
+        texture = "Interface\\Icons\\INV_Misc_Book_09",
+        tab = "Combat",
+        group = "Tank",
+        order = 13,
+        aliases = { "initTank" },
+        builder = "InitCommandsTank",
+        queued = true
+    },
+    {
+        key = "SummonDPS",
+        label = "Invocation",
+        tooltipTitle = "Invocation",
+        tooltipDescription = "Invoque tous les DPS",
+        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
+        tab = "Combat",
+        group = "DPS",
+        order = 10,
+        aliases = { "DPSsummon" },
+        builder = "DPSSummonCommands",
         queued = false
     },
     {
@@ -141,7 +153,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_BackStab",
         tab = "Combat",
         group = "DPS",
-        order = 10,
+        order = 11,
         aliases = { "attackdps", "attack dps" },
         builder = "AttackDPSCommands",
         queued = false
@@ -154,7 +166,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Rogue_FeignDeath",
         tab = "Combat",
         group = "DPS",
-        order = 20,
+        order = 12,
         aliases = { "passivedps", "passive dps" },
         builder = "PassiveDPSCommands",
         queued = false
@@ -167,7 +179,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Spell_Shadow_LastingAfflictions",
         tab = "Combat",
         group = "DPS",
-        order = 30,
+        order = 13,
         aliases = { "waitdps"},
         builder = "WaitDPSCommands",
         queued = false
@@ -180,7 +192,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Kick",
         tab = "Combat",
         group = "DPS",
-        order = 40,
+        order = 14,
         aliases = { "kick" },
         builder = "KickCommands",
         queued = false
@@ -193,9 +205,22 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
         tab = "Combat",
         group = "DPS",
-        order = 41,
+        order = 15,
         aliases = { "dpsflee" },
         builder = "FleeDPSCommands",
+        queued = false
+    },
+    {
+        key = "SummonHeal",
+        label = "Invocation",
+        tooltipTitle = "Invocation",
+        tooltipDescription = "Invoque tous les Heals",
+        texture = "Interface\\Icons\\Spell_Shadow_Teleport",
+        tab = "Combat",
+        group = "Heal",
+        order = 10,
+        aliases = { "Healsummon" },
+        builder = "HealSummonCommands",
         queued = false
     },
     {
@@ -206,7 +231,7 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Spell_Shadow_LastingAfflictions",
         tab = "Combat",
         group = "Heal",
-        order = 10,
+        order = 11,
         aliases = { "waitheal"},
         builder = "WaitHEALCommands",
         queued = false
@@ -219,10 +244,23 @@ BotControl.ActionRegistry = {
         texture = "Interface\\Icons\\Ability_Rogue_FleetFooted",
         tab = "Combat",
         group = "Heal",
-        order = 11,
+        order = 12,
         aliases = { "healflee" },
         builder = "FleeHEALCommands",
         queued = false
+    },
+    {
+        key = "InitHeal",
+        label = "Initialiser les heal",
+        tooltipTitle = "Initialiser les heal",
+        tooltipDescription = "Applique la configuration de base des botsheal",
+        texture = "Interface\\Icons\\INV_Misc_Book_09",
+        tab = "Combat",
+        group = "Heal",
+        order = 13,
+        aliases = { "initHeal" },
+        builder = "InitCommandsHeal",
+        queued = true
     },
     {
         key = "Follow",
